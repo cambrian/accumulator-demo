@@ -1,0 +1,77 @@
+[package]
+name = "accumulator-demo"
+version = "0.1.0"
+edition = "2018"
+authors = [
+  "Pablo Aldape <pablo@vest.io>",
+  "Lucas Ege <lucas@vest.io>",
+  "Sanjay Kannan <sanjay@vest.io>",
+  "Eddie Wang <eddie@vest.io>"
+]
+description = "A demo suite for the accumulator crate."
+keywords = ["cryptography", "demo", "accumulator", "rsa", "vector", "commitment"]
+readme = "README.md"
+repository = "https://github.com/1protocol/accumulator-demo"
+
+[dependencies]
+accumulator = { git = "https://github.com/1protocol/accumulator" }
+blake2-rfc = "0.2.18"
+curve25519-dalek = "1.0.3"
+lazy_static = "1.2.0"
+rug = "1.3.0"
+uuid = "0.7.2"
+
+[[bin]]
+name = "simulation-bridge"
+path = "src/bin/simulation/bridge.rs"
+
+[[bin]]
+name = "simulation-miner"
+path = "src/bin/simulation/miner.rs"
+
+[[bin]]
+name = "simulation-user"
+path = "src/bin/simulation/user.rs"
+
+[[bench]]
+name = "accumulator"
+path = "benches/accumulator.rs"
+harness = false
+
+[[bench]]
+name = "comparison"
+path = "benches/group/comparison.rs"
+harness = false
+
+[[bench]]
+name = "hashes"
+path = "benches/hash/hashes.rs"
+harness = false
+
+[[bench]]
+name = "primality"
+path = "benches/hash/primality.rs"
+harness = false
+
+[[bench]]
+name = "poe"
+path = "benches/proof/poe.rs"
+harness = false
+
+[[bench]]
+name = "pokcr"
+path = "benches/proof/pokcr.rs"
+harness = false
+
+[[bench]]
+name = "poke2"
+path = "benches/proof/poke2.rs"
+harness = false
+
+[profile.bench]
+opt-level = 3
+debug = true
+
+# Flamegraph debug symbols. TODO: Remove when we actually cut releases?
+[profile.release]
+debug = true

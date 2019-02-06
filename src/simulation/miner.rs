@@ -1,7 +1,7 @@
 use super::state::{Block, Transaction};
 use super::util;
-use crate::accumulator::Accumulator;
-use crate::group::UnknownOrderGroup;
+use accumulator::Accumulator;
+use accumulator::group::UnknownOrderGroup;
 use rug::Integer;
 
 pub struct Miner<G: UnknownOrderGroup> {

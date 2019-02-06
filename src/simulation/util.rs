@@ -1,7 +1,7 @@
 use super::state::Transaction;
-use crate::accumulator::Accumulator;
-use crate::group::UnknownOrderGroup;
-use crate::hash::hash_to_prime;
+use accumulator::Accumulator;
+use accumulator::group::UnknownOrderGroup;
+use accumulator::hash::hash_to_prime;
 use rug::Integer;
 
 pub fn elems_from_transactions<G: UnknownOrderGroup>(

@@ -1,7 +1,7 @@
 /// Bridge executable for simulation.
 extern crate accumulator;
 use accumulator::group::Rsa2048;
-use accumulator::simulation::bridge::Bridge;
+use accumulator_demo::simulation::bridge::Bridge;
 use accumulator::Accumulator;
 
 pub fn main() {

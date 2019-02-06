@@ -1,5 +1,5 @@
-use crate::accumulator::{Accumulator, MembershipProof};
-use crate::group::UnknownOrderGroup;
+use accumulator::{Accumulator, MembershipProof};
+use accumulator::group::UnknownOrderGroup;
 use uuid::Uuid;
 
 #[derive(Clone, PartialEq, Eq, Hash)]

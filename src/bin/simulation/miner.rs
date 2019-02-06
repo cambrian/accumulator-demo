@@ -1,7 +1,7 @@
 /// Miner executable for simulation.
 extern crate accumulator;
 use accumulator::group::Rsa2048;
-use accumulator::simulation::miner::Miner;
+use accumulator_demo::simulation::miner::Miner;
 use accumulator::Accumulator;
 
 pub fn main() {

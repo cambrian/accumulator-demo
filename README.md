@@ -15,3 +15,4 @@ A demo suite for the accumulator crate.
 ## Troubleshooting
 - If your RLS hangs at `building`, run `cargo clean && rustup update`.
 - If you get unexpected build errors, delete `Cargo.lock`, run `cargo update`, and re-build.
+- If you run into authentication issues, see [here](https://ricostacruz.com/til/github-two-factor-authentication).

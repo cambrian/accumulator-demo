@@ -24,18 +24,23 @@ impl User {
     witness_response_receiver: BroadcastReceiver<(Vec<Accumulator<G>>)>,
     tx_sender: BroadcastSender<Transaction<G>>,
   ) {
-    // Initialize some Utxos so we can sample
+    // Initialize some UTXOs so we can sample.
     let random_utxo = Utxo { id: Uuid::new_v4() };
     let mut utxo_set = HashSet::new();
     utxo_set.insert(random_utxo);
     let user = User { id, utxo_set };
+
+    // TODO: Empriically consider other options for sleep time.
     let sleep_time = time::Duration::from_millis(1000 / rand::thread_rng().gen_range(1, 11));
     loop {
-      let del_utxo = vec![user.get_input_for_transaction()];
-      if witness_request_sender.try_send(del_utxo.clone()).is_ok() {
+      let utxos_to_delete = vec![user.get_input_for_transaction()];
+      if witness_request_sender
+        .try_send(utxos_to_delete.clone())
+        .is_ok()
+      {
         let witness = witness_response_receiver.recv().unwrap();
-        // Need to map to clone utxo to get value, not reference
-        let utxos_deleted = del_utxo
+        // Need to clone UTXO in map to get a value instead of a reference.
+        let utxo_witnesses_deleted = utxos_to_delete
           .iter()
           .zip(witness.clone())
           .map(|(x, y)| (x.clone(), y))
@@ -43,11 +48,10 @@ impl User {
         let new_utxo = Utxo { id: Uuid::new_v4() };
         let new_trans = Transaction {
           utxos_added: vec![new_utxo],
-          utxos_deleted,
+          utxos_deleted: utxo_witnesses_deleted,
         };
-        if tx_sender.try_send(new_trans).is_ok() {
-          // TODO: Add some success indication ?
-        }
+        // TODO: If this fails, handle gracefully?
+        tx_sender.try_send(new_trans).unwrap();
       }
       thread::sleep(sleep_time);
     }

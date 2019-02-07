@@ -26,8 +26,8 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   #[allow(unused_variables)]
   pub fn launch(
     block_receiver: BroadcastReceiver<Block<G>>,
-    witness_request_receiver: BroadcastReceiver<()>, // TODO (type)
-    witness_response_senders: HashMap<Uuid, BroadcastSender<()>>, // TODO (type)
+    witness_request_receiver: BroadcastReceiver<(Vec<Utxo>)>, // TODO (type)
+    witness_response_senders: HashMap<Uuid, BroadcastSender<(Vec<Accumulator<G>>)>>, // TODO (type)
   ) {
     let bridge = Bridge {
       utxo_set_product: int(1),

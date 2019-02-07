@@ -1,6 +1,5 @@
 //! Simulation runner.
-//! TODO: set up communication channels and start threads for components
-
+//! TODO: Add configurability/statistics.
 mod simulation;
 use accumulator::group::Rsa2048;
 use multiqueue::{broadcast_queue, BroadcastReceiver, BroadcastSender};

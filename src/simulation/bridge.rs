@@ -8,7 +8,7 @@ use accumulator::Accumulator;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
 use rug::Integer;
 use std::clone::Clone;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 #[allow(dead_code)]
@@ -63,7 +63,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   }
 
   /// TODO: Remove?
-  fn create_aggregate_membership_witness(&self, utxos: Vec<Utxo>) -> Accumulator<G> {
+  fn create_aggregate_membership_witness(&self, utxos: HashSet<Utxo>) -> Accumulator<G> {
     let subproduct: Integer = utxos.iter().map(|u| hash_to_prime(u)).product();
     self
       .utxo_set_witness
@@ -74,7 +74,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
 
   /// Generates individual membership witnesses for each given UTXO. See Accumulator::root_factor
   /// and BBF V3 section 4.1.
-  fn create_membership_witnesses(&self, utxos: Vec<Utxo>) -> Vec<Accumulator<G>> {
+  fn create_membership_witnesses(&self, utxos: HashSet<Utxo>) -> Vec<Accumulator<G>> {
     let elems: Vec<Integer> = utxos.iter().map(|u| hash_to_prime(u)).collect();
     let agg_mem_wit = self
       .utxo_set_witness

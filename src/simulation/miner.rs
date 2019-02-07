@@ -10,14 +10,12 @@ use std::sync::Mutex;
 use std::thread::sleep;
 use std::time::Duration;
 
-#[allow(dead_code)]
 pub struct Miner<G: UnknownOrderGroup> {
   acc: Accumulator<G>,
   block_height: u64,
   pending_transactions: Vec<Transaction<G>>,
 }
 
-#[allow(dead_code)]
 impl<G: UnknownOrderGroup> Miner<G> {
   /// Assumes all miners are online from genesis. We may want to implement syncing later.
   #[allow(unused_variables)]

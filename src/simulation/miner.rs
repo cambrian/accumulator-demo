@@ -32,7 +32,8 @@ impl<G: UnknownOrderGroup> Miner<G> {
       pending_transactions: Vec::new(),
     });
 
-    let block_sender_lock = Mutex::new(block_sender);
+    // Even though these receivers are not logically shared, the inner thread is technically sharing
+    // these receivers with the `launch` thread (hence the lock, since `Receiver` is not `Sync`).
     let block_receiver_lock = Mutex::new(block_receiver);
     let tx_receiver_lock = Mutex::new(tx_receiver);
 
@@ -65,9 +66,8 @@ impl<G: UnknownOrderGroup> Miner<G> {
             let miner = miner_lock.lock().unwrap();
             (*miner).forge_block()
           };
-          let block_sender = block_sender_lock.lock().unwrap();
-          (*block_sender).try_send(new_block).unwrap();
           // Note: This miner will consume the forged block via validate.
+          block_sender.try_send(new_block).unwrap();
         }
       }
     })

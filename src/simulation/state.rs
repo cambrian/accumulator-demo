@@ -4,7 +4,7 @@ use uuid::Uuid;
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Utxo {
-  id: Uuid,
+  pub id: Uuid,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

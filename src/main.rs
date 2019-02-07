@@ -1,6 +1,5 @@
 //! Simulation runner.
-//! TODO: set up communication channels and start threads for components
-
+//! TODO: Add configurability/statistics.
 mod simulation;
 use accumulator::group::Rsa2048;
 use multiqueue::{broadcast_queue, BroadcastReceiver, BroadcastSender};
@@ -10,7 +9,7 @@ use std::thread;
 use uuid::Uuid;
 
 // TODO: Put in separate config file?
-const BLOCK_TIME_IN_SECONDS: u16 = 30;
+const BLOCK_TIME_IN_SECONDS: u64 = 30;
 
 const NUM_MINERS: usize = 5;
 const NUM_BRIDGES: usize = 2;
@@ -49,6 +48,7 @@ pub fn main() {
     }));
   }
 
+  #[allow(clippy::needless_range_loop)] // stfu clippy
   for bridge_idx in 0..NUM_BRIDGES {
     let (witness_request_sender, witness_request_receiver) = new_queue();
     let mut witness_response_senders = HashMap::new();

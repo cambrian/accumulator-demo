@@ -45,17 +45,17 @@ impl<G: UnknownOrderGroup> Miner<G> {
           tx_receiver.recv().unwrap()
         };
         let mut miner = miner_lock.lock().unwrap();
-        (*miner).add_transaction(tx);
+        miner.add_transaction(tx);
       });
 
       // Block processor thread.
       s.spawn(|_| loop {
         let block = {
           let block_receiver = block_receiver_lock.lock().unwrap();
-          (*block_receiver).recv().unwrap()
+          block_receiver.recv().unwrap()
         };
         let mut miner = miner_lock.lock().unwrap();
-        (*miner).validate_block(block);
+        miner.validate_block(block);
       });
 
       // Block creation on an interval.
@@ -64,7 +64,7 @@ impl<G: UnknownOrderGroup> Miner<G> {
           sleep(Duration::from_secs(block_interval_seconds));
           let new_block = {
             let miner = miner_lock.lock().unwrap();
-            (*miner).forge_block()
+            miner.forge_block()
           };
           // Note: This miner will consume the forged block via validate.
           block_sender.try_send(new_block).unwrap();

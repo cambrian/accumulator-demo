@@ -4,8 +4,11 @@ use accumulator::group::UnknownOrderGroup;
 use accumulator::hash::hash_to_prime;
 use accumulator::util::int;
 use accumulator::Accumulator;
+use multiqueue::{BroadcastReceiver, BroadcastSender};
 use rug::Integer;
 use std::clone::Clone;
+use std::collections::HashMap;
+use uuid::Uuid;
 
 #[allow(dead_code)]
 #[derive(Clone)]
@@ -13,19 +16,36 @@ pub struct Bridge<G: UnknownOrderGroup> {
   utxo_set_product: Integer,
   utxo_set_witness: Accumulator<G>,
   block_height: u64,
+  block_receiver: BroadcastReceiver<Block<G>>,
+  witness_request_receiver: BroadcastReceiver<()>, // TODO: witness request type
+  // 1 response sender per user
+  witness_response_senders: HashMap<Uuid, BroadcastSender<()>>, // TODO: witness response type
 }
 
 #[allow(dead_code)]
 impl<G: UnknownOrderGroup> Bridge<G> {
-  pub fn setup(acc: Accumulator<G>, block_height: u64) -> Self {
+  /// Assumes all bridges are online from genesis. We may want to implement syncing later.
+  /// Also assumes that bridge/user relationships are fixed
+  pub fn setup(
+    block_receiver: BroadcastReceiver<Block<G>>,
+    witness_request_receiver: BroadcastReceiver<()>,
+    witness_response_senders: HashMap<Uuid, BroadcastSender<()>>,
+  ) -> Self {
     Bridge {
       utxo_set_product: int(1),
-      utxo_set_witness: acc,
-      block_height,
+      utxo_set_witness: Accumulator::<G>::new(),
+      block_height: 0,
+      block_receiver,
+      witness_request_receiver,
+      witness_response_senders,
     }
   }
 
-  pub fn update(&mut self, block: Block<G>) {
+  pub fn run(&mut self) {
+    // TODO
+  }
+
+  fn update(&mut self, block: Block<G>) {
     // Preserves idempotency if multiple miners are leaders.
     if block.height != self.block_height + 1 {
       return;
@@ -61,7 +81,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
 
   /// Generates individual membership witnesses for each given UTXO. See Accumulator::root_factor
   /// and BBF V3 section 4.1.
-  pub fn create_membership_witnesses(&self, utxos: Vec<Utxo>) -> Vec<Accumulator<G>> {
+  fn create_membership_witnesses(&self, utxos: Vec<Utxo>) -> Vec<Accumulator<G>> {
     let elems: Vec<Integer> = utxos.iter().map(|u| hash_to_prime(u)).collect();
     let agg_mem_wit = self
       .utxo_set_witness

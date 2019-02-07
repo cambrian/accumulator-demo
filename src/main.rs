@@ -6,6 +6,7 @@ use accumulator::group::Rsa2048;
 use multiqueue::{broadcast_queue, BroadcastReceiver, BroadcastSender};
 use simulation::{Bridge, Miner, User};
 use std::collections::HashMap;
+use std::thread;
 use uuid::Uuid;
 
 const NUM_MINERS: usize = 5;
@@ -55,13 +56,13 @@ pub fn main() {
   }
   println!("Simulation initialized.");
   for mut miner in miners.into_iter() {
-    miner.run();
+    thread::spawn(move || miner.run());
   }
   for mut bridge in bridges.into_iter() {
-    bridge.run();
+    thread::spawn(move || bridge.run());
   }
   for mut user in users.into_iter() {
-    user.run();
+    thread::spawn(move || user.run());
   }
   println!("Simulation running!")
 }

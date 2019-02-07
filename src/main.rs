@@ -9,7 +9,7 @@ use uuid::Uuid;
 
 const NUM_MINERS: usize = 5;
 const NUM_BRIDGES: usize = 2;
-const NUM_USERS: usize = 25;
+const NUM_USERS_PER_BRIDGE: usize = 25;
 
 fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
   broadcast_queue(256)
@@ -18,7 +18,7 @@ fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
 pub fn main() {
   let mut miners = Vec::with_capacity(NUM_MINERS);
   let mut bridges = Vec::with_capacity(NUM_BRIDGES);
-  let mut users = Vec::with_capacity(NUM_USERS);
+  let mut users = Vec::with_capacity(NUM_BRIDGES * NUM_USERS_PER_BRIDGE);
   let (block_sender, block_receiver) = new_queue();
   let (tx_sender, tx_receiver) = new_queue();
   for i in 0..NUM_MINERS {
@@ -31,11 +31,9 @@ pub fn main() {
     miners.push(miner);
   }
   for i in 0..NUM_BRIDGES {
-    let users_per_bridge = NUM_USERS / NUM_BRIDGES;
-    let j_0 = i * users_per_bridge;
     let (witness_request_sender, witness_request_receiver) = new_queue();
     let mut witness_response_senders = HashMap::new();
-    for _ in j_0..(j_0 + users_per_bridge) {
+    for _ in (i * NUM_USERS_PER_BRIDGE)..((i + 1) * NUM_USERS_PER_BRIDGE) {
       let (witness_response_sender, witness_response_receiver) = new_queue();
       let user_id = Uuid::new_v4();
       witness_response_senders.insert(user_id, witness_response_sender);

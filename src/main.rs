@@ -30,10 +30,10 @@ pub fn main() {
     );
     miners.push(miner);
   }
-  for i in 0..NUM_BRIDGES {
+  for _ in 0..NUM_BRIDGES {
     let (witness_request_sender, witness_request_receiver) = new_queue();
     let mut witness_response_senders = HashMap::new();
-    for _ in (i * NUM_USERS_PER_BRIDGE)..((i + 1) * NUM_USERS_PER_BRIDGE) {
+    for _ in 0..NUM_USERS_PER_BRIDGE {
       let (witness_response_sender, witness_response_receiver) = new_queue();
       let user_id = Uuid::new_v4();
       witness_response_senders.insert(user_id, witness_response_sender);

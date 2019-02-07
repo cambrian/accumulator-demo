@@ -1,3 +1,4 @@
+// TODO: Remove Clippy suppressions.
 use super::state::{Block, Transaction};
 use super::util;
 use accumulator::group::UnknownOrderGroup;
@@ -12,34 +13,29 @@ pub struct Miner<G: UnknownOrderGroup> {
   block_height: u64,
   block_interval_seconds: u16,
   pending_transactions: Vec<Transaction<G>>,
-  block_sender: BroadcastSender<Block<G>>,
-  block_receiver: BroadcastReceiver<Block<G>>,
-  tx_receiver: BroadcastReceiver<Transaction<G>>,
 }
 
 #[allow(dead_code)]
 impl<G: UnknownOrderGroup> Miner<G> {
   /// Assumes all miners are online from genesis. We may want to implement syncing later.
-  pub fn setup(
+  #[allow(unused_variables)]
+  pub fn launch(
     is_leader: bool,
     block_interval_seconds: u16,
     block_sender: BroadcastSender<Block<G>>,
     block_receiver: BroadcastReceiver<Block<G>>,
     tx_receiver: BroadcastReceiver<Transaction<G>>,
-  ) -> Self {
-    Miner {
+  ) {
+    let miner = Miner {
       is_leader,
       acc: Accumulator::<G>::new(),
       block_height: 0,
       block_interval_seconds,
       pending_transactions: Vec::new(),
-      block_sender,
-      block_receiver,
-      tx_receiver,
-    }
+    };
+    // TODO
+    unimplemented!();
   }
-
-  pub fn run(&mut self) {}
 
   fn add_transaction(&mut self, transaction: Transaction<G>) {
     // This contains check could incur overhead; ideally we'd use a set but Rust HashSet is kind of

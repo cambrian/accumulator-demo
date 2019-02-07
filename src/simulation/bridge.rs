@@ -1,3 +1,4 @@
+// TODO: Remove Clippy suppressions.
 use super::state::{Block, Utxo};
 use super::util;
 use accumulator::group::UnknownOrderGroup;
@@ -16,33 +17,25 @@ pub struct Bridge<G: UnknownOrderGroup> {
   utxo_set_product: Integer,
   utxo_set_witness: Accumulator<G>,
   block_height: u64,
-  block_receiver: BroadcastReceiver<Block<G>>,
-  witness_request_receiver: BroadcastReceiver<()>, // TODO: witness request type
-  // 1 response sender per user
-  witness_response_senders: HashMap<Uuid, BroadcastSender<()>>, // TODO: witness response type
 }
 
 #[allow(dead_code)]
 impl<G: UnknownOrderGroup> Bridge<G> {
   /// Assumes all bridges are online from genesis. We may want to implement syncing later.
   /// Also assumes that bridge/user relationships are fixed
-  pub fn setup(
+  #[allow(unused_variables)]
+  pub fn launch(
     block_receiver: BroadcastReceiver<Block<G>>,
-    witness_request_receiver: BroadcastReceiver<()>,
-    witness_response_senders: HashMap<Uuid, BroadcastSender<()>>,
-  ) -> Self {
-    Bridge {
+    witness_request_receiver: BroadcastReceiver<()>, // TODO (type)
+    witness_response_senders: HashMap<Uuid, BroadcastSender<()>>, // TODO (type)
+  ) {
+    let bridge = Bridge {
       utxo_set_product: int(1),
       utxo_set_witness: Accumulator::<G>::new(),
       block_height: 0,
-      block_receiver,
-      witness_request_receiver,
-      witness_response_senders,
-    }
-  }
-
-  pub fn run(&mut self) {
+    };
     // TODO
+    unimplemented!();
   }
 
   fn update(&mut self, block: Block<G>) {

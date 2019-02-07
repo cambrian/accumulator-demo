@@ -1,3 +1,4 @@
+// TODO: Remove Clippy suppressions.
 use super::state::Transaction;
 use super::state::Utxo;
 use accumulator::group::UnknownOrderGroup;
@@ -6,33 +7,26 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 #[allow(dead_code)]
-pub struct User<G: UnknownOrderGroup> {
+pub struct User {
   id: Uuid, // For bridges to know who to send witness responses to.
   utxo_set: HashSet<Utxo>,
-  witness_request_sender: BroadcastSender<()>, // TODO: witness request type
-  witness_response_receiver: BroadcastReceiver<()>, // TODO: witness response type
-  tx_sender: BroadcastSender<Transaction<G>>,  // TODO: witness response type
 }
 
 #[allow(dead_code)]
-impl<G: UnknownOrderGroup> User<G> {
-  pub fn setup(
+impl User {
+  #[allow(unused_variables)]
+  pub fn launch<G: UnknownOrderGroup>(
     id: Uuid,
-    witness_request_sender: BroadcastSender<()>,
-    witness_response_receiver: BroadcastReceiver<()>,
+    witness_request_sender: BroadcastSender<()>, // TODO (type)
+    witness_response_receiver: BroadcastReceiver<()>, // TODO (type)
     tx_sender: BroadcastSender<Transaction<G>>,
-  ) -> Self {
-    User {
+  ) {
+    let user = User {
       id,
       utxo_set: HashSet::new(),
-      witness_request_sender,
-      witness_response_receiver,
-      tx_sender,
-    }
-  }
-
-  pub fn run(&mut self) {
+    };
     // TODO
+    unimplemented!();
   }
 
   // TODO: Maybe support more inputs than one.

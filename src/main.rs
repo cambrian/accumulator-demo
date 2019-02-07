@@ -19,61 +19,62 @@ fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
 }
 
 pub fn main() {
-  let mut miners = Vec::with_capacity(NUM_MINERS);
-  let mut bridges = Vec::with_capacity(NUM_BRIDGES);
-  let mut users = Vec::with_capacity(NUM_BRIDGES * NUM_USERS_PER_BRIDGE);
-
+  println!("Simulation starting.");
+  let mut simulation_threads = Vec::new();
   let (block_sender, block_receiver) = new_queue();
   let (tx_sender, tx_receiver) = new_queue();
 
   for i in 0..NUM_MINERS {
-    let miner = Miner::<Rsa2048>::setup(
-      i == 0,
-      BLOCK_INTERVAL_SECONDS,
-      block_sender.clone(),
-      block_receiver.clone(),
-      tx_receiver.clone(),
-    );
-    miners.push(miner);
+    // These clones cannot go inside the thread closure, since the variable being cloned would get
+    // swallowed by the move (see below as well).
+    let block_sender = block_sender.clone();
+    let block_receiver = block_receiver.add_stream();
+    let tx_receiver = tx_receiver.add_stream();
+    simulation_threads.push(thread::spawn(move || {
+      Miner::<Rsa2048>::launch(
+        i == 0,
+        BLOCK_INTERVAL_SECONDS,
+        block_sender,
+        block_receiver,
+        tx_receiver,
+      )
+    }));
   }
 
   for _ in 0..NUM_BRIDGES {
     let (witness_request_sender, witness_request_receiver) = new_queue();
     let mut witness_response_senders = HashMap::new();
+
     for _ in 0..NUM_USERS_PER_BRIDGE {
       let (witness_response_sender, witness_response_receiver) = new_queue();
       let user_id = Uuid::new_v4();
       witness_response_senders.insert(user_id, witness_response_sender);
-      let user = User::<Rsa2048>::setup(
-        user_id,
-        witness_request_sender.clone(),
-        witness_response_receiver,
-        tx_sender.clone(),
-      );
-      users.push(user);
+
+      let witness_request_sender = witness_request_sender.clone();
+      let tx_sender = tx_sender.clone();
+      simulation_threads.push(thread::spawn(move || {
+        User::launch(
+          user_id,
+          witness_request_sender,
+          witness_response_receiver,
+          tx_sender,
+        );
+      }));
     }
-    let bridge = Bridge::<Rsa2048>::setup(
-      block_receiver.clone(),
-      witness_request_receiver,
-      witness_response_senders,
-    );
-    bridges.push(bridge);
+
+    let block_receiver = block_receiver.add_stream();
+    simulation_threads.push(thread::spawn(move || {
+      Bridge::<Rsa2048>::launch(
+        block_receiver,
+        witness_request_receiver,
+        witness_response_senders,
+      );
+    }));
   }
 
-  println!("Simulation initialized.");
-  let mut simulation_threads = Vec::new();
-  for mut miner in miners {
-    simulation_threads.push(thread::spawn(move || miner.run()));
-  }
-  for mut bridge in bridges {
-    simulation_threads.push(thread::spawn(move || bridge.run()));
-  }
-  for mut user in users {
-    simulation_threads.push(thread::spawn(move || user.run()));
-  }
-  println!("Simulation running!");
+  println!("Simulation running.");
   for thread in simulation_threads {
     thread.join().unwrap();
   }
-  println!("Simulation exiting!");
+  println!("Simulation exiting.");
 }

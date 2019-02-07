@@ -1,9 +1,10 @@
 //! Simulation runner.
 //! TODO: set up communication channels and start threads for components
 
+mod simulation;
 use accumulator::group::Rsa2048;
-use accumulator_demo::simulation::{Bridge, Miner, User};
 use multiqueue::{broadcast_queue, BroadcastReceiver, BroadcastSender};
+use simulation::{Bridge, Miner, User};
 use std::collections::HashMap;
 use uuid::Uuid;
 

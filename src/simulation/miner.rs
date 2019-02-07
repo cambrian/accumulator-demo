@@ -3,15 +3,17 @@ use super::state::{Block, Transaction};
 use super::util;
 use accumulator::group::UnknownOrderGroup;
 use accumulator::Accumulator;
+use crossbeam::thread;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
 use rug::Integer;
+use std::sync::Mutex;
+use std::thread::sleep;
+use std::time::Duration;
 
 #[allow(dead_code)]
 pub struct Miner<G: UnknownOrderGroup> {
-  pub is_leader: bool,
   acc: Accumulator<G>,
   block_height: u64,
-  block_interval_seconds: u16,
   pending_transactions: Vec<Transaction<G>>,
 }
 
@@ -21,20 +23,57 @@ impl<G: UnknownOrderGroup> Miner<G> {
   #[allow(unused_variables)]
   pub fn launch(
     is_leader: bool,
-    block_interval_seconds: u16,
+    block_interval_seconds: u64,
     block_sender: BroadcastSender<Block<G>>,
     block_receiver: BroadcastReceiver<Block<G>>,
     tx_receiver: BroadcastReceiver<Transaction<G>>,
   ) {
-    let miner = Miner {
-      is_leader,
+    let miner_lock = Mutex::new(Miner {
       acc: Accumulator::<G>::new(),
       block_height: 0,
-      block_interval_seconds,
       pending_transactions: Vec::new(),
-    };
-    // TODO
-    unimplemented!();
+    });
+
+    let block_sender_lock = Mutex::new(block_sender);
+    let block_receiver_lock = Mutex::new(block_receiver);
+    let tx_receiver_lock = Mutex::new(tx_receiver);
+
+    thread::scope(|s| {
+      // Transaction processor thread.
+      s.spawn(|_| loop {
+        let tx = {
+          let tx_receiver = tx_receiver_lock.lock().unwrap();
+          tx_receiver.recv().unwrap()
+        };
+        let mut miner = miner_lock.lock().unwrap();
+        (*miner).add_transaction(tx);
+      });
+
+      // Block processor thread.
+      s.spawn(|_| loop {
+        let block = {
+          let block_receiver = block_receiver_lock.lock().unwrap();
+          (*block_receiver).recv().unwrap()
+        };
+        let mut miner = miner_lock.lock().unwrap();
+        (*miner).validate_block(block);
+      });
+
+      // Block creation on an interval.
+      if is_leader {
+        loop {
+          sleep(Duration::from_secs(block_interval_seconds));
+          let new_block = {
+            let miner = miner_lock.lock().unwrap();
+            (*miner).forge_block()
+          };
+          let block_sender = block_sender_lock.lock().unwrap();
+          (*block_sender).try_send(new_block).unwrap();
+          // Note: This miner will consume the forged block via validate.
+        }
+      }
+    })
+    .unwrap();
   }
 
   fn add_transaction(&mut self, transaction: Transaction<G>) {

@@ -12,7 +12,7 @@ use uuid::Uuid;
 const NUM_MINERS: usize = 5;
 const NUM_BRIDGES: usize = 2;
 const NUM_USERS_PER_BRIDGE: usize = 25;
-const BLOCK_INTERVAL_SECONDS: u16 = 30;
+const BLOCK_INTERVAL_SECONDS: u64 = 30;
 
 fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
   broadcast_queue(256)

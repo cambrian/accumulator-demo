@@ -12,7 +12,7 @@ use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct WitnessRequest {
-  pub client_id: Uuid,
+  pub user_id: Uuid,
   pub request_id: Uuid,
   pub utxos: Vec<Utxo>,
 }
@@ -69,7 +69,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
           .lock()
           .unwrap()
           .create_membership_witnesses(request.utxos);
-        witness_response_senders[&request.client_id]
+        witness_response_senders[&request.user_id]
           .try_send(WitnessResponse {
             request_id: request.request_id,
             witnesses,

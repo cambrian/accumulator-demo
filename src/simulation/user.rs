@@ -35,7 +35,7 @@ impl User {
         loop {
           witness_request_sender
             .try_send(WitnessRequest {
-              client_id: user.id,
+              user_id: user.id,
               request_id: witness_request_id,
               utxos: utxos_to_delete.clone(),
             })

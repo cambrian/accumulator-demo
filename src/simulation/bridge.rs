@@ -1,5 +1,4 @@
 use super::state::{Block, Utxo};
-use super::util;
 use accumulator::group::UnknownOrderGroup;
 use accumulator::hash::hash_to_prime;
 use accumulator::Accumulator;
@@ -16,6 +15,7 @@ pub struct Bridge<G: UnknownOrderGroup> {
   utxo_set_product: Integer,
   utxo_set_witness: Accumulator<G>,
   block_height: u64,
+  user_ids: HashSet<Uuid>,
 }
 
 impl<G: UnknownOrderGroup> Bridge<G> {
@@ -35,10 +35,12 @@ impl<G: UnknownOrderGroup> Bridge<G> {
       utxo_set_product,
       utxo_set_witness,
       block_height: 0,
+      user_ids: utxo_update_senders.keys().cloned().collect(),
     });
     let block_receiver_lock = Mutex::new(block_receiver);
     let witness_request_receiver_lock = Mutex::new(witness_request_receiver);
     let witness_response_senders_lock = Mutex::new(witness_response_senders);
+    let utxo_update_senders_lock = Mutex::new(utxo_update_senders);
 
     thread::scope(|s| {
       // Block processor thread.
@@ -48,7 +50,8 @@ impl<G: UnknownOrderGroup> Bridge<G> {
           block_receiver.recv().unwrap()
         };
         let mut bridge = bridge_lock.lock().unwrap();
-        bridge.update(block);
+        let utxo_update_senders = { utxo_update_senders_lock.lock().unwrap() };
+        bridge.update(block, &utxo_update_senders);
       });
 
       // Witness request thread.
@@ -68,28 +71,67 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     .unwrap();
   }
 
-  fn update(&mut self, block: Block<G>) {
+  #[allow(clippy::type_complexity)]
+  fn update(
+    &mut self,
+    block: Block<G>,
+    utxo_update_senders: &HashMap<Uuid, BroadcastSender<(Vec<Utxo>, Vec<Utxo>)>>,
+  ) {
     // Preserves idempotency if multiple miners are leaders.
     if block.height != self.block_height + 1 {
       return;
     }
 
-    let (elems_added, elems_deleted) = util::elems_from_transactions(&block.transactions);
-    let elems_added_product: Integer = elems_added.iter().product();
-    let elems_deleted_product: Integer = elems_deleted.iter().map(|(u, _wit)| u).product();
+    let mut user_updates = HashMap::new();
+    for user_id in self.user_ids.iter() {
+      user_updates.insert(user_id, (Vec::new(), Vec::new()));
+    }
 
-    self.utxo_set_product *= elems_added_product;
-    self.utxo_set_product /= elems_deleted_product;
+    let mut untracked_deletions = Vec::new();
+    let mut untracked_additions = Vec::new();
+    for transaction in block.transactions {
+      for deletion in transaction.utxos_deleted {
+        if self.user_ids.contains(&deletion.0.user_id) {
+          user_updates
+            .get_mut(&deletion.0.user_id)
+            .unwrap()
+            .0
+            .push(deletion.0.clone());
+          self.utxo_set_product /= hash_to_prime(&deletion.0);
+        } else {
+          untracked_deletions.push((hash_to_prime(&deletion.0), deletion.1));
+        }
+      }
+      for addition in transaction.utxos_added {
+        if self.user_ids.contains(&addition.user_id) {
+          user_updates
+            .get_mut(&addition.user_id)
+            .unwrap()
+            .1
+            .push(addition.clone());
+          self.utxo_set_product *= hash_to_prime(&addition);
+        } else {
+          untracked_additions.push(hash_to_prime(&addition));
+        }
+      }
+    }
 
-    // TODO: Avoid clone.
     self.utxo_set_witness = self
       .utxo_set_witness
       .clone()
-      .delete(&elems_deleted)
+      .delete(&untracked_deletions[..])
       .unwrap()
       .0;
-    self.utxo_set_witness = self.utxo_set_witness.clone().add(&elems_added).0;
+    self.utxo_set_witness = self
+      .utxo_set_witness
+      .clone()
+      .add(&untracked_additions[..])
+      .0;
     self.block_height = block.height;
+
+    for (user_id, update) in user_updates {
+      utxo_update_senders[user_id].try_send(update).unwrap();
+    }
   }
 
   /// TODO: Remove?

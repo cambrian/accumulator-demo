@@ -20,7 +20,7 @@ impl<G: UnknownOrderGroup> Miner<G> {
   pub fn start(
     is_leader: bool,
     acc: Accumulator<G>,
-    block_interval_seconds: u64,
+    block_interval_ms: u64,
     block_sender: BroadcastSender<Block<G>>,
     block_receiver: BroadcastReceiver<Block<G>>,
     tx_receiver: BroadcastReceiver<Transaction<G>>,
@@ -51,7 +51,7 @@ impl<G: UnknownOrderGroup> Miner<G> {
       // Block creation on an interval.
       if is_leader {
         loop {
-          sleep(Duration::from_secs(block_interval_seconds));
+          sleep(Duration::from_millis(block_interval_ms));
           let new_block = {
             let miner = miner_lock.lock().unwrap();
             miner.forge_block()

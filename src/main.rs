@@ -18,7 +18,7 @@ const NUM_USERS: usize = 1;
 
 // NOTE: Ensure that sum of USERS_ASSIGNED_TO_BRIDGE is NUM_USERS.
 const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [1; 1];
-const BLOCK_TIME_IN_SECONDS: u64 = 30;
+const BLOCK_TIME_MS: u64 = 250;
 
 fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
   broadcast_queue(256)
@@ -57,7 +57,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
       Miner::<G>::start(
         miner_idx == 0, // Elect first miner as leader.
         init_acc,
-        BLOCK_TIME_IN_SECONDS,
+        BLOCK_TIME_MS,
         block_sender,
         block_receiver,
         tx_receiver,
@@ -116,6 +116,12 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   }
 
   println!("Simulation running.");
+  // need to join this?
+  thread::spawn(move || {
+    for block in block_receiver {
+      dbg!(block);
+    }
+  });
   for thread in simulation_threads {
     thread.join().unwrap();
   }

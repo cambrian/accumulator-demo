@@ -33,25 +33,23 @@ impl User {
     let sleep_time = time::Duration::from_millis(1000 / tx_issuance_freq_in_hz);
     loop {
       let utxos_to_delete = vec![user.get_input_for_transaction()];
-      if witness_request_sender
+      witness_request_sender
         .try_send(utxos_to_delete.clone())
-        .is_ok()
-      {
-        let witness = witness_response_receiver.recv().unwrap();
-        // Need to clone UTXO in map to get a value instead of a reference.
-        let utxo_witnesses_deleted = utxos_to_delete
-          .iter()
-          .zip(witness.clone())
-          .map(|(x, y)| (x.clone(), y))
-          .collect();
-        let new_utxo = Utxo { id: Uuid::new_v4() };
-        let new_trans = Transaction {
-          utxos_added: vec![new_utxo],
-          utxos_deleted: utxo_witnesses_deleted,
-        };
-        // TODO: If this fails, handle gracefully?
-        tx_sender.try_send(new_trans).unwrap();
-      }
+        .unwrap();
+      let witnesses_to_delete = witness_response_receiver.recv().unwrap();
+      // Need to clone UTXO in map to get a value instead of a reference.
+      let utxo_witnesses_deleted = utxos_to_delete
+        .iter()
+        .zip(witnesses_to_delete.clone())
+        .map(|(x, y)| (x.clone(), y))
+        .collect();
+      let new_utxo = Utxo { id: Uuid::new_v4() };
+      let new_trans = Transaction {
+        utxos_added: vec![new_utxo],
+        utxos_deleted: utxo_witnesses_deleted,
+      };
+      // TODO: If this fails, handle gracefully?
+      tx_sender.try_send(new_trans).unwrap();
       thread::sleep(sleep_time);
     }
   }

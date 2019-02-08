@@ -20,8 +20,7 @@ const NUM_USERS: usize = 50;
 
 // NOTE: Ensure that sum of USERS_ASSIGNED_TO_BRIDGE is NUM_USERS.
 const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [25; 2];
-#[allow(dead_code)]
-const TX_ISSUANCE_FREQUENCIES: [usize; NUM_USERS] = [10; NUM_USERS];
+const TX_ISSUANCE_FREQS_IN_HZ: [u64; NUM_USERS] = [10; NUM_USERS];
 
 fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
   broadcast_queue(256)
@@ -60,7 +59,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     }));
   }
 
-  let mut utxo_index = 0;
+  let mut user_idx = 0;
   #[allow(clippy::needless_range_loop)] // stfu clippy
   for bridge_idx in 0..NUM_BRIDGES {
     let (witness_request_sender, witness_request_receiver) = new_queue();
@@ -71,19 +70,20 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
       let user_id = Uuid::new_v4();
       witness_response_senders.insert(user_id, witness_response_sender);
 
-      let init_utxo = rand_utxos[utxo_index].clone();
+      let init_utxo = rand_utxos[user_idx].clone();
       let witness_request_sender = witness_request_sender.clone();
       let tx_sender = tx_sender.clone();
       simulation_threads.push(thread::spawn(move || {
         User::launch(
           user_id,
           init_utxo,
+          TX_ISSUANCE_FREQS_IN_HZ[user_idx],
           witness_request_sender,
           witness_response_receiver,
           tx_sender,
         );
       }));
-      utxo_index += 1;
+      user_idx += 1;
     }
 
     let block_receiver = block_receiver.add_stream();

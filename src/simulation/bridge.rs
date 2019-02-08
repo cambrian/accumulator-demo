@@ -37,7 +37,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   /// Also assumes that bridge/user relationships are fixed
   #[allow(unused_variables)]
   #[allow(clippy::type_complexity)]
-  pub fn launch(
+  pub fn start(
     utxo_set_witness: Accumulator<G>,
     utxo_set_product: Integer,
     block_receiver: BroadcastReceiver<Block<G>>,

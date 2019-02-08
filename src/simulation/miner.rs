@@ -21,13 +21,14 @@ impl<G: UnknownOrderGroup> Miner<G> {
   #[allow(unused_variables)]
   pub fn launch(
     is_leader: bool,
+    acc: Accumulator<G>,
     block_interval_seconds: u64,
     block_sender: BroadcastSender<Block<G>>,
     block_receiver: BroadcastReceiver<Block<G>>,
     tx_receiver: BroadcastReceiver<Transaction<G>>,
   ) {
     let miner_lock = Mutex::new(Miner {
-      acc: Accumulator::<G>::new(),
+      acc,
       block_height: 0,
       pending_transactions: Vec::new(),
     });

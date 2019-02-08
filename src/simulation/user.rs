@@ -20,14 +20,13 @@ impl User {
   #[allow(unused_variables)]
   pub fn launch<G: 'static + UnknownOrderGroup>(
     id: Uuid,
+    init_utxo: Utxo,
     witness_request_sender: BroadcastSender<(Vec<Utxo>)>,
     witness_response_receiver: BroadcastReceiver<(Vec<Accumulator<G>>)>,
     tx_sender: BroadcastSender<Transaction<G>>,
   ) {
-    // Initialize some UTXOs so we can sample.
-    let random_utxo = Utxo { id: Uuid::new_v4() };
     let mut utxo_set = HashSet::new();
-    utxo_set.insert(random_utxo);
+    utxo_set.insert(init_utxo);
     let user = User { id, utxo_set };
 
     // TODO: Empriically consider other options for sleep time.

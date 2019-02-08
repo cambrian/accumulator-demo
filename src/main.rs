@@ -141,7 +141,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   println!("Simulation running.");
   simulation_threads.push(thread::spawn(move || {
     for block in block_receiver {
-      println!("Block");
+      dbg!(block);
     }
   }));
   for thread in simulation_threads {

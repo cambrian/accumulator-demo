@@ -3,6 +3,7 @@
 mod simulation;
 use accumulator::group::{Rsa2048, UnknownOrderGroup};
 use accumulator::hash::hash_to_prime;
+use accumulator::util::int;
 use accumulator::Accumulator;
 use multiqueue::{broadcast_queue, BroadcastReceiver, BroadcastSender};
 use simulation::state::Utxo;
@@ -14,12 +15,12 @@ use uuid::Uuid;
 // TODO: Put in separate config file?
 const BLOCK_TIME_IN_SECONDS: u64 = 30;
 
-const NUM_MINERS: usize = 5;
-const NUM_BRIDGES: usize = 2;
-const NUM_USERS: usize = 50;
+const NUM_MINERS: usize = 1;
+const NUM_BRIDGES: usize = 1;
+const NUM_USERS: usize = 1;
 
 // NOTE: Ensure that sum of USERS_ASSIGNED_TO_BRIDGE is NUM_USERS.
-const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [25; 2];
+const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [1; 1];
 const TX_ISSUANCE_FREQS_IN_HZ: [u64; NUM_USERS] = [10; NUM_USERS];
 
 fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
@@ -64,6 +65,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   for bridge_idx in 0..NUM_BRIDGES {
     let (witness_request_sender, witness_request_receiver) = new_queue();
     let mut witness_response_senders = HashMap::new();
+    let mut bridge_utxo_set_product = int(1);
 
     for _ in 0..USERS_ASSIGNED_TO_BRIDGE[bridge_idx] {
       let (witness_response_sender, witness_response_receiver) = new_queue();
@@ -71,6 +73,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
       witness_response_senders.insert(user_id, witness_response_sender);
 
       let init_utxo = rand_utxos[user_idx].clone();
+      bridge_utxo_set_product *= hash_to_prime(&init_utxo);
       let witness_request_sender = witness_request_sender.clone();
       let tx_sender = tx_sender.clone();
       simulation_threads.push(thread::spawn(move || {
@@ -91,6 +94,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     simulation_threads.push(thread::spawn(move || {
       Bridge::<G>::launch(
         init_acc,
+        bridge_utxo_set_product,
         block_receiver,
         witness_request_receiver,
         witness_response_senders,

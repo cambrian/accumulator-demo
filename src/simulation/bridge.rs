@@ -3,7 +3,6 @@ use super::state::{Block, Utxo};
 use super::util;
 use accumulator::group::UnknownOrderGroup;
 use accumulator::hash::hash_to_prime;
-use accumulator::util::int;
 use accumulator::Accumulator;
 use crossbeam::thread;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
@@ -28,12 +27,13 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   #[allow(unused_variables)]
   pub fn launch(
     utxo_set_witness: Accumulator<G>,
+    utxo_set_product: Integer,
     block_receiver: BroadcastReceiver<Block<G>>,
     witness_request_receiver: BroadcastReceiver<(Uuid, HashSet<Utxo>)>,
     witness_response_senders: HashMap<Uuid, BroadcastSender<(Vec<Accumulator<G>>)>>,
   ) {
     let bridge_lock = Mutex::new(Bridge {
-      utxo_set_product: int(1),
+      utxo_set_product,
       utxo_set_witness,
       block_height: 0,
     });
@@ -44,8 +44,6 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     thread::scope(|s| {
       // Block listening Thread
       s.spawn(|_| loop {
-        // let mut bridge = bridge_lock.lock().unwrap();
-        // let block = block_receiver.recv().unwrap();
         let block = {
           let block_receiver = block_receiver_lock.lock().unwrap();
           block_receiver.recv().unwrap()
@@ -62,12 +60,10 @@ impl<G: UnknownOrderGroup> Bridge<G> {
         };
         let memwit_response = {
           let bridge = bridge_lock.lock().unwrap();
-          bridge.create_aggregate_membership_witness(memwit_request)
+          bridge.create_membership_witnesses(memwit_request)
         };
         let witness_sender = witness_response_senders_lock.lock().unwrap();
-        witness_sender[&user_id]
-          .try_send(vec![memwit_response])
-          .unwrap();
+        witness_sender[&user_id].try_send(memwit_response).unwrap();
       });
     })
     .unwrap();

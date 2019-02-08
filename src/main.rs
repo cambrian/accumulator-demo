@@ -12,12 +12,11 @@ use std::collections::HashMap;
 use std::thread;
 use uuid::Uuid;
 
-// TODO: Put in separate config file?
-const BLOCK_TIME_IN_SECONDS: u64 = 30;
-
 const NUM_MINERS: usize = 1;
 const NUM_BRIDGES: usize = 1;
 const NUM_USERS: usize = 1;
+
+const BLOCK_TIME_IN_SECONDS: u64 = 30;
 
 // NOTE: Ensure that sum of USERS_ASSIGNED_TO_BRIDGE is NUM_USERS.
 const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [1; 1];
@@ -33,20 +32,22 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   let (block_sender, block_receiver) = new_queue();
   let (tx_sender, tx_receiver) = new_queue();
 
-  let mut init_acc = Accumulator::<G>::new();
-  let mut rand_utxos = Vec::new();
+  // Initialize genesis user data.
   let mut user_ids = Vec::new();
-  for _ in 0..(NUM_BRIDGES * NUM_USERS) {
+  let mut user_utxos = Vec::new();
+  let mut init_acc = Accumulator::<G>::new();
+  for _ in 0..NUM_USERS {
     let user_id = Uuid::new_v4();
     user_ids.push(user_id);
-    let rand_utxo = Utxo {
+    let user_utxo = Utxo {
       id: Uuid::new_v4(),
       user_id,
     };
-    init_acc = init_acc.add(&[hash_to_prime(&rand_utxo)]).0;
-    rand_utxos.push(rand_utxo);
+    init_acc = init_acc.add(&[hash_to_prime(&user_utxo)]).0;
+    user_utxos.push(user_utxo);
   }
 
+  // Initialize miner threads.
   for miner_idx in 0..NUM_MINERS {
     // These clones cannot go inside the thread closure, since the variable being cloned would get
     // swallowed by the move (see below as well).
@@ -66,6 +67,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     }));
   }
 
+  // Initialize bridge threads.
   let mut user_idx = 0;
   #[allow(clippy::needless_range_loop)]
   for bridge_idx in 0..NUM_BRIDGES {
@@ -74,21 +76,24 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     let mut utxo_update_senders = HashMap::new();
     let mut bridge_utxo_set_product = int(1);
 
+    // Initialize configurable user threads per bridge.
     for _ in 0..USERS_ASSIGNED_TO_BRIDGE[bridge_idx] {
+      let user_id = user_ids[user_idx];
+      let user_utxo = user_utxos[user_idx].clone();
+      bridge_utxo_set_product *= hash_to_prime(&user_utxo);
+
+      // Associate user IDs with RPC response channels.
       let (witness_response_sender, witness_response_receiver) = new_queue();
       let (utxo_update_sender, utxo_update_receiver) = new_queue();
-      let user_id = user_ids[user_idx];
       witness_response_senders.insert(user_id, witness_response_sender);
       utxo_update_senders.insert(user_id, utxo_update_sender);
 
-      let init_utxo = rand_utxos[user_idx].clone();
-      bridge_utxo_set_product *= hash_to_prime(&init_utxo);
       let witness_request_sender = witness_request_sender.clone();
       let tx_sender = tx_sender.clone();
       simulation_threads.push(thread::spawn(move || {
         User::launch(
           user_id,
-          init_utxo,
+          user_utxo,
           TX_ISSUANCE_FREQS_IN_HZ[user_idx],
           witness_request_sender,
           witness_response_receiver,

@@ -135,12 +135,11 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   }
 
   println!("Simulation running.");
-  // need to join this?
-  thread::spawn(move || {
+  simulation_threads.push(thread::spawn(move || {
     for block in block_receiver {
       dbg!(block);
     }
-  });
+  }));
   for thread in simulation_threads {
     thread.join().unwrap();
   }

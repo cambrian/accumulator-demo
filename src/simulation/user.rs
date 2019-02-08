@@ -15,7 +15,7 @@ impl User {
   #[allow(unused_variables)]
   // Right now users are limited to one transaction per block (i.e. they can issue one transaction
   // based on their UTXO set as of some block). TODO: Allow for more tx per user per block.
-  pub fn launch<G: 'static + UnknownOrderGroup>(
+  pub fn start<G: 'static + UnknownOrderGroup>(
     id: Uuid,
     init_utxo: Utxo,
     witness_request_sender: BroadcastSender<WitnessRequest>,

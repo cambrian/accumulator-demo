@@ -17,7 +17,7 @@ pub struct Miner<G: UnknownOrderGroup> {
 
 impl<G: UnknownOrderGroup> Miner<G> {
   /// Assumes all miners are online from genesis. We may want to implement syncing later.
-  pub fn launch(
+  pub fn start(
     is_leader: bool,
     acc: Accumulator<G>,
     block_interval_seconds: u64,

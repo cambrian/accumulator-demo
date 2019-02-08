@@ -54,7 +54,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     let block_receiver = block_receiver.add_stream();
     let tx_receiver = tx_receiver.add_stream();
     simulation_threads.push(thread::spawn(move || {
-      Miner::<G>::launch(
+      Miner::<G>::start(
         miner_idx == 0, // Elect first miner as leader.
         init_acc,
         BLOCK_TIME_IN_SECONDS,
@@ -89,7 +89,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
       let witness_request_sender = witness_request_sender.clone();
       let tx_sender = tx_sender.clone();
       simulation_threads.push(thread::spawn(move || {
-        User::launch(
+        User::start(
           user_id,
           user_utxo,
           witness_request_sender,
@@ -104,7 +104,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     let block_receiver = block_receiver.add_stream();
     let init_acc = init_acc.clone();
     simulation_threads.push(thread::spawn(move || {
-      Bridge::<G>::launch(
+      Bridge::<G>::start(
         init_acc,
         bridge_utxo_set_product,
         block_receiver,

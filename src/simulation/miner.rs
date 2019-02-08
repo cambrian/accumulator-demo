@@ -31,30 +31,21 @@ impl<G: UnknownOrderGroup> Miner<G> {
       pending_transactions: Vec::new(),
     });
 
-    // Even though these receivers are not logically shared, the inner thread is technically sharing
-    // these receivers with the `launch` thread (hence the lock, since `Receiver` is not `Sync`).
-    let block_receiver_lock = Mutex::new(block_receiver);
-    let tx_receiver_lock = Mutex::new(tx_receiver);
-
     thread::scope(|s| {
       // Transaction processor thread.
-      s.spawn(|_| loop {
-        let tx = {
-          let tx_receiver = tx_receiver_lock.lock().unwrap();
-          tx_receiver.recv().unwrap()
-        };
-        let mut miner = miner_lock.lock().unwrap();
-        miner.add_transaction(tx);
+      s.spawn(|_| {
+        for tx in tx_receiver {
+          let mut miner = miner_lock.lock().unwrap();
+          miner.add_transaction(tx);
+        }
       });
 
       // Block processor thread.
-      s.spawn(|_| loop {
-        let block = {
-          let block_receiver = block_receiver_lock.lock().unwrap();
-          block_receiver.recv().unwrap()
-        };
-        let mut miner = miner_lock.lock().unwrap();
-        miner.validate_block(block);
+      s.spawn(|_| {
+        for block in block_receiver {
+          let mut miner = miner_lock.lock().unwrap();
+          miner.validate_block(block);
+        }
       });
 
       // Block creation on an interval.

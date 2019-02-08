@@ -44,6 +44,12 @@ impl User {
           if response.request_id == witness_request_id {
             break response.witnesses;
           }
+          // drain any other responses so we don't loop forever
+          loop {
+            if witness_response_receiver.try_recv().is_err() {
+              break;
+            }
+          }
         }
       };
       let new_utxo = Utxo {

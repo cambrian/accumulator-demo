@@ -30,6 +30,7 @@ impl User {
     loop {
       let mut utxos_to_delete = Vec::new();
       utxos_to_delete.push(user.get_input_for_transaction());
+
       let witnesses_to_delete = {
         let witness_request_id = Uuid::new_v4();
         loop {
@@ -44,7 +45,7 @@ impl User {
           if response.request_id == witness_request_id {
             break response.witnesses;
           }
-          // drain any other responses so we don't loop forever
+          // Drain any other responses so we don't loop forever.
           loop {
             if witness_response_receiver.try_recv().is_err() {
               break;
@@ -52,14 +53,17 @@ impl User {
           }
         }
       };
+
       let new_utxo = Utxo {
         id: Uuid::new_v4(),
         user_id: user.id,
       };
+
       let new_trans = Transaction {
         utxos_added: vec![new_utxo],
         utxos_deleted: witnesses_to_delete,
       };
+
       tx_sender.try_send(new_trans).unwrap();
       let (deleted_inputs, added_outputs) = utxo_update_receiver.recv().unwrap();
       user.update(&deleted_inputs, &added_outputs);

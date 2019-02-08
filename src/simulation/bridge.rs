@@ -34,7 +34,7 @@ pub struct Bridge<G: UnknownOrderGroup> {
 
 impl<G: UnknownOrderGroup> Bridge<G> {
   /// Assumes all bridges are online from genesis. We may want to implement syncing later.
-  /// Also assumes that bridge/user relationships are fixed
+  /// Also assumes that bridge/user relationships are fixed in `main`.
   #[allow(unused_variables)]
   #[allow(clippy::type_complexity)]
   pub fn launch(
@@ -45,27 +45,26 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     witness_response_senders: HashMap<Uuid, BroadcastSender<WitnessResponse<G>>>,
     utxo_update_senders: HashMap<Uuid, BroadcastSender<(Vec<Utxo>, Vec<Utxo>)>>,
   ) {
-    let state = Arc::new(Mutex::new(Bridge {
+    let bridge_ref = Arc::new(Mutex::new(Bridge {
       utxo_set_product,
       utxo_set_witness,
       block_height: 0,
       user_ids: utxo_update_senders.keys().cloned().collect(),
     }));
 
-    let updater_state_ref = state.clone();
-    thread::spawn(move || {
+    // Block updater thread.
+    let bridge = bridge_ref.clone();
+    let update_thread = thread::spawn(move || {
       for block in block_receiver {
-        updater_state_ref
-          .lock()
-          .unwrap()
-          .update(block, &utxo_update_senders);
+        bridge.lock().unwrap().update(block, &utxo_update_senders);
       }
     });
 
-    let responder_state_ref = state.clone();
-    thread::spawn(move || {
+    // Witness request handler.
+    let bridge = bridge_ref.clone();
+    let witness_thread = thread::spawn(move || {
       for request in witness_request_receiver {
-        let witnesses = responder_state_ref
+        let witnesses = bridge
           .lock()
           .unwrap()
           .create_membership_witnesses(request.utxos);
@@ -77,6 +76,9 @@ impl<G: UnknownOrderGroup> Bridge<G> {
           .unwrap();
       }
     });
+
+    update_thread.join().unwrap();
+    witness_thread.join().unwrap();
   }
 
   #[allow(clippy::type_complexity)]

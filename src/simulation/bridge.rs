@@ -2,7 +2,6 @@ use super::state::{Block, Utxo};
 use accumulator::group::UnknownOrderGroup;
 use accumulator::hash::hash_to_prime;
 use accumulator::Accumulator;
-// use crossbeam::thread;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
 use rug::Integer;
 use std::clone::Clone;

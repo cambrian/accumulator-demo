@@ -134,6 +134,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     }));
   }
 
+  tx_receiver.unsubscribe();
   println!("Simulation running.");
   simulation_threads.push(thread::spawn(move || {
     for block in block_receiver {

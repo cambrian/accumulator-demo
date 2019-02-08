@@ -13,13 +13,11 @@ const BLOCK_TIME_IN_SECONDS: u64 = 30;
 
 const NUM_MINERS: usize = 5;
 const NUM_BRIDGES: usize = 2;
-#[allow(dead_code)]
 const NUM_USERS: usize = 50;
 
 // NOTE: Ensure that sum of USERS_ASSIGNED_TO_BRIDGE is NUM_USERS.
 const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [25; 2];
-#[allow(dead_code)]
-const TX_ISSUANCE_FREQUENCIES: [usize; NUM_USERS] = [10; NUM_USERS];
+const TX_ISSUANCE_FREQS_IN_HZ: [u64; NUM_USERS] = [10; NUM_USERS];
 
 fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
   broadcast_queue(256)
@@ -48,6 +46,7 @@ pub fn main() {
     }));
   }
 
+  let mut user_idx = 0;
   #[allow(clippy::needless_range_loop)] // stfu clippy
   for bridge_idx in 0..NUM_BRIDGES {
     let (witness_request_sender, witness_request_receiver) = new_queue();
@@ -63,11 +62,13 @@ pub fn main() {
       simulation_threads.push(thread::spawn(move || {
         User::launch(
           user_id,
+          TX_ISSUANCE_FREQS_IN_HZ[user_idx],
           witness_request_sender,
           witness_response_receiver,
           tx_sender,
         );
       }));
+      user_idx += 1;
     }
 
     let block_receiver = block_receiver.add_stream();

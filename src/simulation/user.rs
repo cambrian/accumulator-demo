@@ -4,7 +4,6 @@ use super::state::Utxo;
 use accumulator::group::UnknownOrderGroup;
 use accumulator::Accumulator;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
-use rand::Rng;
 use std::collections::HashSet;
 use std::{thread, time};
 use uuid::Uuid;
@@ -20,6 +19,7 @@ impl User {
   #[allow(unused_variables)]
   pub fn launch<G: 'static + UnknownOrderGroup>(
     id: Uuid,
+    tx_issuance_freq_in_hz: u64,
     witness_request_sender: BroadcastSender<(Vec<Utxo>)>,
     witness_response_receiver: BroadcastReceiver<(Vec<Accumulator<G>>)>,
     tx_sender: BroadcastSender<Transaction<G>>,
@@ -30,8 +30,8 @@ impl User {
     utxo_set.insert(random_utxo);
     let user = User { id, utxo_set };
 
-    // TODO: Empriically consider other options for sleep time.
-    let sleep_time = time::Duration::from_millis(1000 / rand::thread_rng().gen_range(1, 11));
+    // TODO: Sample from Exponential distribution instead of fixed interval?
+    let sleep_time = time::Duration::from_millis(1000 / tx_issuance_freq_in_hz);
     loop {
       let utxos_to_delete = vec![user.get_input_for_transaction()];
       if witness_request_sender

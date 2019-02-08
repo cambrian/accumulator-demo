@@ -49,7 +49,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     let tx_receiver = tx_receiver.add_stream();
     simulation_threads.push(thread::spawn(move || {
       Miner::<G>::launch(
-        miner_idx == 0, // elect first miner as leader
+        miner_idx == 0, // Elect first miner as leader.
         init_acc,
         BLOCK_TIME_IN_SECONDS,
         block_sender,
@@ -60,7 +60,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   }
 
   let mut user_idx = 0;
-  #[allow(clippy::needless_range_loop)] // stfu clippy
+  #[allow(clippy::needless_range_loop)]
   for bridge_idx in 0..NUM_BRIDGES {
     let (witness_request_sender, witness_request_receiver) = new_queue();
     let mut witness_response_senders = HashMap::new();

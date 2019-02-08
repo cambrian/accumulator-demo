@@ -25,13 +25,14 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   /// Also assumes that bridge/user relationships are fixed
   #[allow(unused_variables)]
   pub fn launch(
+    utxo_set_witness: Accumulator<G>,
     block_receiver: BroadcastReceiver<Block<G>>,
-    witness_request_receiver: BroadcastReceiver<(Vec<Utxo>)>, // TODO (type)
-    witness_response_senders: HashMap<Uuid, BroadcastSender<(Vec<Accumulator<G>>)>>, // TODO (type)
+    witness_request_receiver: BroadcastReceiver<(Vec<Utxo>)>,
+    witness_response_senders: HashMap<Uuid, BroadcastSender<(Vec<Accumulator<G>>)>>,
   ) {
     let bridge = Bridge {
       utxo_set_product: int(1),
-      utxo_set_witness: Accumulator::<G>::new(),
+      utxo_set_witness,
       block_height: 0,
     };
     // TODO

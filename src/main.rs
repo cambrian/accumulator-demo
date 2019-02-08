@@ -87,8 +87,10 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     }
 
     let block_receiver = block_receiver.add_stream();
+    let init_acc = init_acc.clone();
     simulation_threads.push(thread::spawn(move || {
       Bridge::<G>::launch(
+        init_acc,
         block_receiver,
         witness_request_receiver,
         witness_response_senders,

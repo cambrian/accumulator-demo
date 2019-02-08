@@ -35,8 +35,14 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
 
   let mut init_acc = Accumulator::<G>::new();
   let mut rand_utxos = Vec::new();
+  let mut user_ids = Vec::new();
   for _ in 0..(NUM_BRIDGES * NUM_USERS) {
-    let rand_utxo = Utxo { id: Uuid::new_v4() };
+    let user_id = Uuid::new_v4();
+    user_ids.push(user_id);
+    let rand_utxo = Utxo {
+      id: Uuid::new_v4(),
+      user_id,
+    };
     init_acc = init_acc.add(&[hash_to_prime(&rand_utxo)]).0;
     rand_utxos.push(rand_utxo);
   }
@@ -65,12 +71,15 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   for bridge_idx in 0..NUM_BRIDGES {
     let (witness_request_sender, witness_request_receiver) = new_queue();
     let mut witness_response_senders = HashMap::new();
+    let mut utxo_update_senders = HashMap::new();
     let mut bridge_utxo_set_product = int(1);
 
     for _ in 0..USERS_ASSIGNED_TO_BRIDGE[bridge_idx] {
       let (witness_response_sender, witness_response_receiver) = new_queue();
-      let user_id = Uuid::new_v4();
+      let (utxo_update_sender, utxo_update_receiver) = new_queue();
+      let user_id = user_ids[user_idx];
       witness_response_senders.insert(user_id, witness_response_sender);
+      utxo_update_senders.insert(user_id, utxo_update_sender);
 
       let init_utxo = rand_utxos[user_idx].clone();
       bridge_utxo_set_product *= hash_to_prime(&init_utxo);
@@ -84,6 +93,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
           witness_request_sender,
           witness_response_receiver,
           tx_sender,
+          utxo_update_receiver,
         );
       }));
       user_idx += 1;
@@ -98,6 +108,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
         block_receiver,
         witness_request_receiver,
         witness_response_senders,
+        utxo_update_senders,
       );
     }));
   }

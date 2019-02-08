@@ -25,12 +25,14 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   /// Assumes all bridges are online from genesis. We may want to implement syncing later.
   /// Also assumes that bridge/user relationships are fixed
   #[allow(unused_variables)]
+  #[allow(clippy::type_complexity)]
   pub fn launch(
     utxo_set_witness: Accumulator<G>,
     utxo_set_product: Integer,
     block_receiver: BroadcastReceiver<Block<G>>,
     witness_request_receiver: BroadcastReceiver<(Uuid, HashSet<Utxo>)>,
     witness_response_senders: HashMap<Uuid, BroadcastSender<(Vec<Accumulator<G>>)>>,
+    utxo_update_senders: HashMap<Uuid, BroadcastSender<(Vec<Utxo>, Vec<Utxo>)>>,
   ) {
     let bridge_lock = Mutex::new(Bridge {
       utxo_set_product,

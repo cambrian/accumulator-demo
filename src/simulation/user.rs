@@ -24,6 +24,7 @@ impl User {
     witness_request_sender: BroadcastSender<(Uuid, HashSet<Utxo>)>,
     witness_response_receiver: BroadcastReceiver<(Vec<Accumulator<G>>)>,
     tx_sender: BroadcastSender<Transaction<G>>,
+    utxo_update_receiver: BroadcastReceiver<(Vec<Utxo>, Vec<Utxo>)>,
   ) {
     let mut utxo_set = HashSet::new();
     utxo_set.insert(init_utxo);
@@ -45,7 +46,10 @@ impl User {
         .zip(witnesses_to_delete.clone())
         .map(|(x, y)| (x.clone(), y))
         .collect();
-      let new_utxo = Utxo { id: Uuid::new_v4() };
+      let new_utxo = Utxo {
+        id: Uuid::new_v4(),
+        user_id: user.id,
+      };
       let new_trans = Transaction {
         utxos_added: vec![new_utxo],
         utxos_deleted: utxo_witnesses_deleted,

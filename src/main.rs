@@ -33,6 +33,8 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   // Initialize genesis user data.
   let mut user_ids = Vec::new();
   let mut user_utxos = Vec::new();
+  let mut user_elems = Vec::new();
+  let mut user_utxos_product = int(1);
   let mut init_acc = Accumulator::<G>::new();
   for _ in 0..NUM_USERS {
     let user_id = Uuid::new_v4();
@@ -41,8 +43,18 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
       id: Uuid::new_v4(),
       user_id,
     };
-    init_acc = init_acc.add(&[hash_to_prime(&user_utxo)]).0;
+    let user_elem = hash_to_prime(&user_utxo);
+    init_acc = init_acc.add(&[user_elem.clone()]).0;
+    user_utxos_product *= user_elem.clone();
     user_utxos.push(user_utxo);
+    user_elems.push(user_elem);
+  }
+
+  let mut user_witnesses = Vec::new();
+  for user_elem in &user_elems {
+    let user_acc = Accumulator::<G>::new();
+    let witness_exp = &user_utxos_product / user_elem.clone();
+    user_witnesses.push(user_acc.add(&[witness_exp]).0);
   }
 
   // Initialize miner threads.
@@ -73,12 +85,20 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     let mut witness_response_senders = HashMap::new();
     let mut utxo_update_senders = HashMap::new();
     let mut bridge_utxo_set_product = int(1);
+    let mut bridge_init_acc = init_acc.clone();
 
     // Initialize configurable user threads per bridge.
     for _ in 0..USERS_ASSIGNED_TO_BRIDGE[bridge_idx] {
       let user_id = user_ids[user_idx];
       let user_utxo = user_utxos[user_idx].clone();
-      bridge_utxo_set_product *= hash_to_prime(&user_utxo);
+      bridge_utxo_set_product *= user_elems[user_idx].clone();
+      bridge_init_acc = bridge_init_acc
+        .delete(&[(
+          user_elems[user_idx].clone(),
+          user_witnesses[user_idx].clone(),
+        )])
+        .unwrap()
+        .0;
 
       // Associate user IDs with RPC response channels.
       let (witness_response_sender, witness_response_receiver) = new_queue();
@@ -102,10 +122,9 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     }
 
     let block_receiver = block_receiver.add_stream();
-    let init_acc = init_acc.clone();
     simulation_threads.push(thread::spawn(move || {
       Bridge::<G>::start(
-        init_acc,
+        bridge_init_acc,
         bridge_utxo_set_product,
         block_receiver,
         witness_request_receiver,

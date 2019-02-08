@@ -6,19 +6,20 @@ use accumulator::hash::hash_to_prime;
 use accumulator::util::int;
 use accumulator::Accumulator;
 use multiqueue::{broadcast_queue, BroadcastReceiver, BroadcastSender};
+use rug::Integer;
 use simulation::state::Utxo;
 use simulation::{Bridge, Miner, User};
 use std::collections::HashMap;
 use std::thread;
 use uuid::Uuid;
 
-const NUM_MINERS: usize = 1;
-const NUM_BRIDGES: usize = 1;
-const NUM_USERS: usize = 1;
+const NUM_MINERS: usize = 5;
+const NUM_BRIDGES: usize = 5;
+const NUM_USERS: usize = 50;
 
 // NOTE: Ensure that sum of USERS_ASSIGNED_TO_BRIDGE is NUM_USERS.
-const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [1; 1];
-const BLOCK_TIME_MS: u64 = 250;
+const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [10; 5];
+const BLOCK_TIME_MS: u64 = 1000;
 
 fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
   broadcast_queue(256)
@@ -84,21 +85,23 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     let (witness_request_sender, witness_request_receiver) = new_queue();
     let mut witness_response_senders = HashMap::new();
     let mut utxo_update_senders = HashMap::new();
-    let mut bridge_utxo_set_product = int(1);
-    let mut bridge_init_acc = init_acc.clone();
+
+    let num_users_for_bridge = USERS_ASSIGNED_TO_BRIDGE[bridge_idx];
+    let user_elem_witnesses: Vec<(Integer, Accumulator<G>)> = user_elems
+      [user_idx..user_idx + num_users_for_bridge]
+      .iter()
+      .zip(user_witnesses[user_idx..user_idx + num_users_for_bridge].iter())
+      .map(|(elem, witness)| (elem.clone(), witness.clone()))
+      .collect();
+    let bridge_init_acc = init_acc.clone().delete(&user_elem_witnesses).unwrap().0;
+    let bridge_utxo_set_product = user_elems[user_idx..user_idx + num_users_for_bridge]
+      .iter()
+      .product();;
 
     // Initialize configurable user threads per bridge.
-    for _ in 0..USERS_ASSIGNED_TO_BRIDGE[bridge_idx] {
+    for _ in 0..num_users_for_bridge {
       let user_id = user_ids[user_idx];
       let user_utxo = user_utxos[user_idx].clone();
-      bridge_utxo_set_product *= user_elems[user_idx].clone();
-      bridge_init_acc = bridge_init_acc
-        .delete(&[(
-          user_elems[user_idx].clone(),
-          user_witnesses[user_idx].clone(),
-        )])
-        .unwrap()
-        .0;
 
       // Associate user IDs with RPC response channels.
       let (witness_response_sender, witness_response_receiver) = new_queue();
@@ -138,7 +141,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   println!("Simulation running.");
   simulation_threads.push(thread::spawn(move || {
     for block in block_receiver {
-      dbg!(block);
+      println!("Block");
     }
   }));
   for thread in simulation_threads {

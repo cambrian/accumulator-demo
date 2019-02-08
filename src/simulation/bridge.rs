@@ -97,8 +97,6 @@ impl<G: UnknownOrderGroup> Bridge<G> {
       user_updates.insert(user_id, (Vec::new(), Vec::new()));
     }
 
-    let mut untracked_deletions = Vec::new();
-    let mut untracked_additions = Vec::new();
     for transaction in block.transactions {
       for deletion in transaction.utxos_deleted {
         if self.user_ids.contains(&deletion.0.user_id) {
@@ -108,8 +106,6 @@ impl<G: UnknownOrderGroup> Bridge<G> {
             .0
             .push(deletion.0.clone());
           self.utxo_set_product /= hash_to_prime(&deletion.0);
-        } else {
-          untracked_deletions.push((hash_to_prime(&deletion.0), deletion.1));
         }
       }
       for addition in transaction.utxos_added {
@@ -120,22 +116,14 @@ impl<G: UnknownOrderGroup> Bridge<G> {
             .1
             .push(addition.clone());
           self.utxo_set_product *= hash_to_prime(&addition);
-        } else {
-          untracked_additions.push(hash_to_prime(&addition));
         }
       }
     }
 
-    self.utxo_set_witness = self
-      .utxo_set_witness
-      .clone()
-      .delete(&untracked_deletions[..])
+    self.utxo_set_witness = block
+      .new_acc
+      .delete(&[(self.utxo_set_product.clone(), self.utxo_set_witness.clone())])
       .unwrap()
-      .0;
-    self.utxo_set_witness = self
-      .utxo_set_witness
-      .clone()
-      .add(&untracked_additions[..])
       .0;
     self.block_height = block.height;
 

@@ -1,4 +1,3 @@
-// TODO: Remove Clippy suppressions.
 use super::state::{Block, Utxo};
 use super::util;
 use accumulator::group::UnknownOrderGroup;
@@ -12,7 +11,6 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Mutex;
 use uuid::Uuid;
 
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Bridge<G: UnknownOrderGroup> {
   utxo_set_product: Integer,
@@ -20,7 +18,6 @@ pub struct Bridge<G: UnknownOrderGroup> {
   block_height: u64,
 }
 
-#[allow(dead_code)]
 impl<G: UnknownOrderGroup> Bridge<G> {
   /// Assumes all bridges are online from genesis. We may want to implement syncing later.
   /// Also assumes that bridge/user relationships are fixed
@@ -44,7 +41,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     let witness_response_senders_lock = Mutex::new(witness_response_senders);
 
     thread::scope(|s| {
-      // Block listening Thread
+      // Block processor thread.
       s.spawn(|_| loop {
         let block = {
           let block_receiver = block_receiver_lock.lock().unwrap();
@@ -54,7 +51,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
         bridge.update(block);
       });
 
-      // Memwit processing thread
+      // Witness request thread.
       s.spawn(|_| loop {
         let (user_id, memwit_request) = {
           let witness_receiver = witness_request_receiver_lock.lock().unwrap();
@@ -96,6 +93,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   }
 
   /// TODO: Remove?
+  #[allow(dead_code)]
   fn create_aggregate_membership_witness(&self, utxos: HashSet<Utxo>) -> Accumulator<G> {
     let subproduct: Integer = utxos.iter().map(|u| hash_to_prime(u)).product();
     self

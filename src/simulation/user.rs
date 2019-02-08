@@ -1,41 +1,35 @@
-// TODO: Remove Clippy suppressions.
 use super::state::Transaction;
 use super::state::Utxo;
 use accumulator::group::UnknownOrderGroup;
 use accumulator::Accumulator;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
 use std::collections::HashSet;
-use std::{thread, time};
 use uuid::Uuid;
 
-#[allow(dead_code)]
 pub struct User {
   id: Uuid, // For bridges to know who to send witness responses to.
   utxo_set: HashSet<Utxo>,
 }
 
-#[allow(dead_code)]
 impl User {
   #[allow(unused_variables)]
+  // Right now users are limited to one transaction per block (i.e. they can issue one transaction
+  // based on their UTXO set as of some block). TODO: Allow for more tx per user per block.
   pub fn launch<G: 'static + UnknownOrderGroup>(
     id: Uuid,
     init_utxo: Utxo,
-    tx_issuance_freq_in_hz: u64,
     witness_request_sender: BroadcastSender<(Uuid, HashSet<Utxo>)>,
     witness_response_receiver: BroadcastReceiver<(Vec<Accumulator<G>>)>,
-    tx_sender: BroadcastSender<Transaction<G>>,
     utxo_update_receiver: BroadcastReceiver<(Vec<Utxo>, Vec<Utxo>)>,
+    tx_sender: BroadcastSender<Transaction<G>>,
   ) {
     let mut utxo_set = HashSet::new();
     utxo_set.insert(init_utxo);
-    let user = User { id, utxo_set };
+    let mut user = User { id, utxo_set };
 
-    // TODO: Sample from Exponential distribution instead of fixed interval?
-    let sleep_time = time::Duration::from_millis(1000 / tx_issuance_freq_in_hz);
     loop {
       let mut utxos_to_delete = HashSet::new();
       utxos_to_delete.insert(user.get_input_for_transaction());
-      // let utxos_to_delete = vec![user.get_input_for_transaction()];
       witness_request_sender
         .try_send((user.id, utxos_to_delete.clone()))
         .unwrap();
@@ -54,9 +48,9 @@ impl User {
         utxos_added: vec![new_utxo],
         utxos_deleted: utxo_witnesses_deleted,
       };
-      // TODO: If this fails, handle gracefully?
       tx_sender.try_send(new_trans).unwrap();
-      thread::sleep(sleep_time);
+      let (deleted_inputs, added_outputs) = utxo_update_receiver.recv().unwrap();
+      user.update(&deleted_inputs, &added_outputs);
     }
   }
 

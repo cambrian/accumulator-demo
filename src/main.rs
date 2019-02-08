@@ -16,11 +16,9 @@ const NUM_MINERS: usize = 1;
 const NUM_BRIDGES: usize = 1;
 const NUM_USERS: usize = 1;
 
-const BLOCK_TIME_IN_SECONDS: u64 = 30;
-
 // NOTE: Ensure that sum of USERS_ASSIGNED_TO_BRIDGE is NUM_USERS.
 const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [1; 1];
-const TX_ISSUANCE_FREQS_IN_HZ: [u64; NUM_USERS] = [10; NUM_USERS];
+const BLOCK_TIME_IN_SECONDS: u64 = 30;
 
 fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
   broadcast_queue(256)
@@ -94,11 +92,10 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
         User::launch(
           user_id,
           user_utxo,
-          TX_ISSUANCE_FREQS_IN_HZ[user_idx],
           witness_request_sender,
           witness_response_receiver,
-          tx_sender,
           utxo_update_receiver,
+          tx_sender,
         );
       }));
       user_idx += 1;

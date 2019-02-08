@@ -1,4 +1,3 @@
-// TODO: Remove Clippy suppressions.
 use super::state::{Block, Transaction};
 use super::util;
 use accumulator::group::UnknownOrderGroup;
@@ -18,7 +17,6 @@ pub struct Miner<G: UnknownOrderGroup> {
 
 impl<G: UnknownOrderGroup> Miner<G> {
   /// Assumes all miners are online from genesis. We may want to implement syncing later.
-  #[allow(unused_variables)]
   pub fn launch(
     is_leader: bool,
     acc: Accumulator<G>,

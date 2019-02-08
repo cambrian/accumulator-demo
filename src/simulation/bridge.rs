@@ -120,6 +120,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
       }
     }
 
+    // TODO: This is broken! How to fix?
     self.utxo_set_witness = block
       .new_acc
       .delete(&[(self.utxo_set_product.clone(), self.utxo_set_witness.clone())])

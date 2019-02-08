@@ -21,7 +21,7 @@ impl User {
     id: Uuid,
     init_utxo: Utxo,
     tx_issuance_freq_in_hz: u64,
-    witness_request_sender: BroadcastSender<(Vec<Utxo>)>,
+    witness_request_sender: BroadcastSender<(Uuid, HashSet<Utxo>)>,
     witness_response_receiver: BroadcastReceiver<(Vec<Accumulator<G>>)>,
     tx_sender: BroadcastSender<Transaction<G>>,
   ) {
@@ -32,9 +32,11 @@ impl User {
     // TODO: Sample from Exponential distribution instead of fixed interval?
     let sleep_time = time::Duration::from_millis(1000 / tx_issuance_freq_in_hz);
     loop {
-      let utxos_to_delete = vec![user.get_input_for_transaction()];
+      let mut utxos_to_delete = HashSet::new();
+      utxos_to_delete.insert(user.get_input_for_transaction());
+      // let utxos_to_delete = vec![user.get_input_for_transaction()];
       witness_request_sender
-        .try_send(utxos_to_delete.clone())
+        .try_send((user.id, utxos_to_delete.clone()))
         .unwrap();
       let witnesses_to_delete = witness_response_receiver.recv().unwrap();
       // Need to clone UTXO in map to get a value instead of a reference.

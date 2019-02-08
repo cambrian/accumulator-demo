@@ -5,10 +5,12 @@ use accumulator::group::UnknownOrderGroup;
 use accumulator::hash::hash_to_prime;
 use accumulator::util::int;
 use accumulator::Accumulator;
+use crossbeam::thread;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
 use rug::Integer;
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
+use std::sync::Mutex;
 use uuid::Uuid;
 
 #[allow(dead_code)]
@@ -27,16 +29,48 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   pub fn launch(
     utxo_set_witness: Accumulator<G>,
     block_receiver: BroadcastReceiver<Block<G>>,
-    witness_request_receiver: BroadcastReceiver<(Vec<Utxo>)>,
+    witness_request_receiver: BroadcastReceiver<(Uuid, HashSet<Utxo>)>,
     witness_response_senders: HashMap<Uuid, BroadcastSender<(Vec<Accumulator<G>>)>>,
   ) {
-    let bridge = Bridge {
+    let bridge_lock = Mutex::new(Bridge {
       utxo_set_product: int(1),
       utxo_set_witness,
       block_height: 0,
-    };
-    // TODO
-    unimplemented!();
+    });
+    let block_receiver_lock = Mutex::new(block_receiver);
+    let witness_request_receiver_lock = Mutex::new(witness_request_receiver);
+    let witness_response_senders_lock = Mutex::new(witness_response_senders);
+
+    thread::scope(|s| {
+      // Block listening Thread
+      s.spawn(|_| loop {
+        // let mut bridge = bridge_lock.lock().unwrap();
+        // let block = block_receiver.recv().unwrap();
+        let block = {
+          let block_receiver = block_receiver_lock.lock().unwrap();
+          block_receiver.recv().unwrap()
+        };
+        let mut bridge = bridge_lock.lock().unwrap();
+        bridge.update(block);
+      });
+
+      // Memwit processing thread
+      s.spawn(|_| loop {
+        let (user_id, memwit_request) = {
+          let witness_receiver = witness_request_receiver_lock.lock().unwrap();
+          witness_receiver.recv().unwrap()
+        };
+        let memwit_response = {
+          let bridge = bridge_lock.lock().unwrap();
+          bridge.create_aggregate_membership_witness(memwit_request)
+        };
+        let witness_sender = witness_response_senders_lock.lock().unwrap();
+        witness_sender[&user_id]
+          .try_send(vec![memwit_response])
+          .unwrap();
+      });
+    })
+    .unwrap();
   }
 
   fn update(&mut self, block: Block<G>) {

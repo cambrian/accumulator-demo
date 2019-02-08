@@ -1,7 +1,7 @@
 use super::state::Transaction;
 use super::state::Utxo;
+use crate::simulation::bridge::{WitnessRequest, WitnessResponse};
 use accumulator::group::UnknownOrderGroup;
-use accumulator::Accumulator;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
 use std::collections::HashSet;
 use uuid::Uuid;
@@ -18,8 +18,8 @@ impl User {
   pub fn launch<G: 'static + UnknownOrderGroup>(
     id: Uuid,
     init_utxo: Utxo,
-    witness_request_sender: BroadcastSender<(Uuid, HashSet<Utxo>)>,
-    witness_response_receiver: BroadcastReceiver<(Vec<Accumulator<G>>)>,
+    witness_request_sender: BroadcastSender<WitnessRequest>,
+    witness_response_receiver: BroadcastReceiver<WitnessResponse<G>>,
     utxo_update_receiver: BroadcastReceiver<(Vec<Utxo>, Vec<Utxo>)>,
     tx_sender: BroadcastSender<Transaction<G>>,
   ) {
@@ -28,25 +28,31 @@ impl User {
     let mut user = User { id, utxo_set };
 
     loop {
-      let mut utxos_to_delete = HashSet::new();
-      utxos_to_delete.insert(user.get_input_for_transaction());
-      witness_request_sender
-        .try_send((user.id, utxos_to_delete.clone()))
-        .unwrap();
-      let witnesses_to_delete = witness_response_receiver.recv().unwrap();
-      // Need to clone UTXO in map to get a value instead of a reference.
-      let utxo_witnesses_deleted = utxos_to_delete
-        .iter()
-        .zip(witnesses_to_delete.clone())
-        .map(|(x, y)| (x.clone(), y))
-        .collect();
+      let mut utxos_to_delete = Vec::new();
+      utxos_to_delete.push(user.get_input_for_transaction());
+      let witnesses_to_delete = {
+        let witness_request_id = Uuid::new_v4();
+        loop {
+          witness_request_sender
+            .try_send(WitnessRequest {
+              client_id: user.id,
+              request_id: witness_request_id,
+              utxos: utxos_to_delete.clone(),
+            })
+            .unwrap();
+          let response = witness_response_receiver.recv().unwrap();
+          if response.request_id == witness_request_id {
+            break response.witnesses;
+          }
+        }
+      };
       let new_utxo = Utxo {
         id: Uuid::new_v4(),
         user_id: user.id,
       };
       let new_trans = Transaction {
         utxos_added: vec![new_utxo],
-        utxos_deleted: utxo_witnesses_deleted,
+        utxos_deleted: witnesses_to_delete,
       };
       tx_sender.try_send(new_trans).unwrap();
       let (deleted_inputs, added_outputs) = utxo_update_receiver.recv().unwrap();

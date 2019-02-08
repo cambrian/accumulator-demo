@@ -2,14 +2,29 @@ use super::state::{Block, Utxo};
 use accumulator::group::UnknownOrderGroup;
 use accumulator::hash::hash_to_prime;
 use accumulator::Accumulator;
-use crossbeam::thread;
+// use crossbeam::thread;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
 use rug::Integer;
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
+use std::thread;
 use uuid::Uuid;
 
+#[derive(Clone, Debug)]
+pub struct WitnessRequest {
+  pub client_id: Uuid,
+  pub request_id: Uuid,
+  pub utxos: Vec<Utxo>,
+}
+
+#[derive(Clone, Debug)]
+pub struct WitnessResponse<G: UnknownOrderGroup> {
+  pub request_id: Uuid,
+  pub witnesses: Vec<(Utxo, Accumulator<G>)>,
+}
+
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Bridge<G: UnknownOrderGroup> {
   utxo_set_product: Integer,
@@ -27,48 +42,42 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     utxo_set_witness: Accumulator<G>,
     utxo_set_product: Integer,
     block_receiver: BroadcastReceiver<Block<G>>,
-    witness_request_receiver: BroadcastReceiver<(Uuid, HashSet<Utxo>)>,
-    witness_response_senders: HashMap<Uuid, BroadcastSender<(Vec<Accumulator<G>>)>>,
+    witness_request_receiver: BroadcastReceiver<WitnessRequest>,
+    witness_response_senders: HashMap<Uuid, BroadcastSender<WitnessResponse<G>>>,
     utxo_update_senders: HashMap<Uuid, BroadcastSender<(Vec<Utxo>, Vec<Utxo>)>>,
   ) {
-    let bridge_lock = Mutex::new(Bridge {
+    let state = Arc::new(Mutex::new(Bridge {
       utxo_set_product,
       utxo_set_witness,
       block_height: 0,
       user_ids: utxo_update_senders.keys().cloned().collect(),
+    }));
+
+    let updater_state_ref = state.clone();
+    thread::spawn(move || {
+      for block in block_receiver {
+        updater_state_ref
+          .lock()
+          .unwrap()
+          .update(block, &utxo_update_senders);
+      }
     });
-    let block_receiver_lock = Mutex::new(block_receiver);
-    let witness_request_receiver_lock = Mutex::new(witness_request_receiver);
-    let witness_response_senders_lock = Mutex::new(witness_response_senders);
-    let utxo_update_senders_lock = Mutex::new(utxo_update_senders);
 
-    thread::scope(|s| {
-      // Block processor thread.
-      s.spawn(|_| loop {
-        let block = {
-          let block_receiver = block_receiver_lock.lock().unwrap();
-          block_receiver.recv().unwrap()
-        };
-        let mut bridge = bridge_lock.lock().unwrap();
-        let utxo_update_senders = { utxo_update_senders_lock.lock().unwrap() };
-        bridge.update(block, &utxo_update_senders);
-      });
-
-      // Witness request thread.
-      s.spawn(|_| loop {
-        let (user_id, memwit_request) = {
-          let witness_receiver = witness_request_receiver_lock.lock().unwrap();
-          witness_receiver.recv().unwrap()
-        };
-        let memwit_response = {
-          let bridge = bridge_lock.lock().unwrap();
-          bridge.create_membership_witnesses(memwit_request)
-        };
-        let witness_sender = witness_response_senders_lock.lock().unwrap();
-        witness_sender[&user_id].try_send(memwit_response).unwrap();
-      });
-    })
-    .unwrap();
+    let responder_state_ref = state.clone();
+    thread::spawn(move || {
+      for request in witness_request_receiver {
+        let witnesses = responder_state_ref
+          .lock()
+          .unwrap()
+          .create_membership_witnesses(request.utxos);
+        witness_response_senders[&request.client_id]
+          .try_send(WitnessResponse {
+            request_id: request.request_id,
+            witnesses,
+          })
+          .unwrap();
+      }
+    });
   }
 
   #[allow(clippy::type_complexity)]
@@ -134,26 +143,21 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     }
   }
 
-  /// TODO: Remove?
-  #[allow(dead_code)]
-  fn create_aggregate_membership_witness(&self, utxos: HashSet<Utxo>) -> Accumulator<G> {
-    let subproduct: Integer = utxos.iter().map(|u| hash_to_prime(u)).product();
-    self
-      .utxo_set_witness
-      .clone()
-      .exp_quotient(self.utxo_set_product.clone(), subproduct)
-      .unwrap()
-  }
-
   /// Generates individual membership witnesses for each given UTXO. See Accumulator::root_factor
   /// and BBF V3 section 4.1.
-  fn create_membership_witnesses(&self, utxos: HashSet<Utxo>) -> Vec<Accumulator<G>> {
+  fn create_membership_witnesses(&self, utxos: Vec<Utxo>) -> Vec<(Utxo, Accumulator<G>)> {
     let elems: Vec<Integer> = utxos.iter().map(|u| hash_to_prime(u)).collect();
     let agg_mem_wit = self
       .utxo_set_witness
       .clone()
       .exp_quotient(self.utxo_set_product.clone(), elems.iter().product())
       .unwrap();
-    agg_mem_wit.root_factor(&elems)
+    let witnesses = agg_mem_wit.root_factor(&elems);
+    // ideally root factor would return the zipped version internally
+    utxos
+      .iter()
+      .zip(witnesses.iter())
+      .map(|(x, y)| (x.clone(), y.clone()))
+      .collect()
   }
 }

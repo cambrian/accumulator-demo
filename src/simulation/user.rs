@@ -1,6 +1,6 @@
 use super::state::Transaction;
 use super::state::Utxo;
-use crate::simulation::bridge::{WitnessRequest, WitnessResponse};
+use crate::simulation::bridge::{UserUpdate, WitnessRequest, WitnessResponse};
 use accumulator::group::UnknownOrderGroup;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
 use std::collections::HashSet;
@@ -20,7 +20,7 @@ impl User {
     init_utxo: Utxo,
     witness_request_sender: BroadcastSender<WitnessRequest>,
     witness_response_receiver: BroadcastReceiver<WitnessResponse<G>>,
-    utxo_update_receiver: BroadcastReceiver<(Vec<Utxo>, Vec<Utxo>)>,
+    user_update_receiver: BroadcastReceiver<UserUpdate>,
     tx_sender: BroadcastSender<Transaction<G>>,
   ) {
     let mut utxo_set = HashSet::new();
@@ -65,8 +65,7 @@ impl User {
       };
 
       tx_sender.try_send(new_trans).unwrap();
-      let (deleted_inputs, added_outputs) = utxo_update_receiver.recv().unwrap();
-      user.update(&deleted_inputs, &added_outputs);
+      user.update(user_update_receiver.recv().unwrap());
     }
   }
 
@@ -76,12 +75,12 @@ impl User {
     self.utxo_set.iter().next().unwrap().clone()
   }
 
-  fn update(&mut self, deleted_inputs: &[Utxo], added_outputs: &[Utxo]) {
-    for del in deleted_inputs {
-      self.utxo_set.remove(&del);
+  fn update(&mut self, update: UserUpdate) {
+    for utxo in update.utxos_deleted {
+      self.utxo_set.remove(&utxo);
     }
-    for add in added_outputs {
-      self.utxo_set.insert(add.clone());
+    for utxo in update.utxos_added {
+      self.utxo_set.insert(utxo.clone());
     }
   }
 }

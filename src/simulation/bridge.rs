@@ -23,6 +23,12 @@ pub struct WitnessResponse<G: UnknownOrderGroup> {
   pub witnesses: Vec<(Utxo, Accumulator<G>)>,
 }
 
+#[derive(Clone, Debug)]
+pub struct UserUpdate {
+  pub utxos_added: Vec<Utxo>,
+  pub utxos_deleted: Vec<Utxo>,
+}
+
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct Bridge<G: UnknownOrderGroup> {
@@ -43,20 +49,20 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     block_receiver: BroadcastReceiver<Block<G>>,
     witness_request_receiver: BroadcastReceiver<WitnessRequest>,
     witness_response_senders: HashMap<Uuid, BroadcastSender<WitnessResponse<G>>>,
-    utxo_update_senders: HashMap<Uuid, BroadcastSender<(Vec<Utxo>, Vec<Utxo>)>>,
+    user_update_senders: HashMap<Uuid, BroadcastSender<UserUpdate>>,
   ) {
     let bridge_ref = Arc::new(Mutex::new(Bridge {
       utxo_set_product,
       utxo_set_witness,
       block_height: 0,
-      user_ids: utxo_update_senders.keys().cloned().collect(),
+      user_ids: user_update_senders.keys().cloned().collect(),
     }));
 
     // Block updater thread.
     let bridge = bridge_ref.clone();
     let update_thread = thread::spawn(move || {
       for block in block_receiver {
-        bridge.lock().unwrap().update(block, &utxo_update_senders);
+        bridge.lock().unwrap().update(block, &user_update_senders);
       }
     });
 
@@ -85,7 +91,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   fn update(
     &mut self,
     block: Block<G>,
-    utxo_update_senders: &HashMap<Uuid, BroadcastSender<(Vec<Utxo>, Vec<Utxo>)>>,
+    user_update_senders: &HashMap<Uuid, BroadcastSender<UserUpdate>>,
   ) {
     // Preserves idempotency if multiple miners are leaders.
     if block.height != self.block_height + 1 {
@@ -94,28 +100,34 @@ impl<G: UnknownOrderGroup> Bridge<G> {
 
     let mut user_updates = HashMap::new();
     for user_id in self.user_ids.iter() {
-      user_updates.insert(user_id, (Vec::new(), Vec::new()));
+      user_updates.insert(
+        user_id,
+        UserUpdate {
+          utxos_added: Vec::new(),
+          utxos_deleted: Vec::new(),
+        },
+      );
     }
 
     for transaction in block.transactions {
-      for deletion in transaction.utxos_deleted {
-        if self.user_ids.contains(&deletion.0.user_id) {
+      for (utxo, _witness) in transaction.utxos_deleted {
+        if self.user_ids.contains(&utxo.user_id) {
           user_updates
-            .get_mut(&deletion.0.user_id)
+            .get_mut(&utxo.user_id)
             .unwrap()
-            .0
-            .push(deletion.0.clone());
-          self.utxo_set_product /= hash_to_prime(&deletion.0);
+            .utxos_deleted
+            .push(utxo.clone());
+          self.utxo_set_product /= hash_to_prime(&utxo);
         }
       }
-      for addition in transaction.utxos_added {
-        if self.user_ids.contains(&addition.user_id) {
+      for utxo in transaction.utxos_added {
+        if self.user_ids.contains(&utxo.user_id) {
           user_updates
-            .get_mut(&addition.user_id)
+            .get_mut(&utxo.user_id)
             .unwrap()
-            .1
-            .push(addition.clone());
-          self.utxo_set_product *= hash_to_prime(&addition);
+            .utxos_added
+            .push(utxo.clone());
+          self.utxo_set_product *= hash_to_prime(&utxo);
         }
       }
     }
@@ -129,7 +141,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     self.block_height = block.height;
 
     for (user_id, update) in user_updates {
-      utxo_update_senders[user_id].try_send(update).unwrap();
+      user_update_senders[user_id].try_send(update).unwrap();
     }
   }
 

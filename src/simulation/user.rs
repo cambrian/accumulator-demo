@@ -28,22 +28,22 @@ impl User {
     let mut user = User { id, utxo_set };
 
     loop {
-      let mut utxos_to_delete = Vec::new();
-      utxos_to_delete.push(user.get_input_for_transaction());
+      let mut utxos_to_spend = Vec::new();
+      utxos_to_spend.push(user.get_input_for_transaction());
 
-      let witnesses_to_delete = {
+      let utxos_spent_with_witnesses = {
         let witness_request_id = Uuid::new_v4();
         loop {
           witness_request_sender
             .try_send(WitnessRequest {
               user_id: user.id,
               request_id: witness_request_id,
-              utxos: utxos_to_delete.clone(),
+              utxos: utxos_to_spend.clone(),
             })
             .unwrap();
           let response = witness_response_receiver.recv().unwrap();
           if response.request_id == witness_request_id {
-            break response.witnesses;
+            break response.utxos_with_witnesses;
           }
           // Drain any other responses so we don't loop forever.
           loop {
@@ -60,8 +60,8 @@ impl User {
       };
 
       let new_trans = Transaction {
-        utxos_added: vec![new_utxo],
-        utxos_deleted: witnesses_to_delete,
+        utxos_created: vec![new_utxo],
+        utxos_spent_with_witnesses,
       };
 
       tx_sender.try_send(new_trans).unwrap();

@@ -10,8 +10,8 @@ pub struct Utxo {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Transaction<G: UnknownOrderGroup> {
-  pub utxos_added: Vec<Utxo>,
-  pub utxos_deleted: Vec<(Utxo, Accumulator<G>)>,
+  pub utxos_created: Vec<Utxo>,
+  pub utxos_spent_with_witnesses: Vec<(Utxo, Accumulator<G>)>,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]

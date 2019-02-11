@@ -20,7 +20,7 @@ pub struct WitnessRequest {
 #[derive(Clone, Debug)]
 pub struct WitnessResponse<G: UnknownOrderGroup> {
   pub request_id: Uuid,
-  pub witnesses: Vec<(Utxo, Accumulator<G>)>,
+  pub utxos_with_witnesses: Vec<(Utxo, Accumulator<G>)>,
 }
 
 #[derive(Clone, Debug)]
@@ -70,14 +70,14 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     let bridge = bridge_ref.clone();
     let witness_thread = thread::spawn(move || {
       for request in witness_request_receiver {
-        let witnesses = bridge
+        let utxos_with_witnesses = bridge
           .lock()
           .unwrap()
           .create_membership_witnesses(request.utxos);
         witness_response_senders[&request.user_id]
           .try_send(WitnessResponse {
             request_id: request.request_id,
-            witnesses,
+            utxos_with_witnesses,
           })
           .unwrap();
       }
@@ -110,7 +110,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     }
 
     for transaction in block.transactions {
-      for (utxo, _witness) in transaction.utxos_deleted {
+      for (utxo, _witness) in transaction.utxos_spent_with_witnesses {
         if self.user_ids.contains(&utxo.user_id) {
           user_updates
             .get_mut(&utxo.user_id)
@@ -120,7 +120,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
           self.utxo_set_product /= hash_to_prime(&utxo);
         }
       }
-      for utxo in transaction.utxos_added {
+      for utxo in transaction.utxos_created {
         if self.user_ids.contains(&utxo.user_id) {
           user_updates
             .get_mut(&utxo.user_id)

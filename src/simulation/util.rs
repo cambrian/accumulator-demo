@@ -11,9 +11,9 @@ pub fn elems_from_transactions<G: UnknownOrderGroup>(
   let mut elems_deleted = Vec::new();
 
   for tx in transactions {
-    elems_added.extend(tx.utxos_added.iter().map(|u| hash_to_prime(u)));
+    elems_added.extend(tx.utxos_created.iter().map(|u| hash_to_prime(u)));
     elems_deleted.extend(
-      tx.utxos_deleted
+      tx.utxos_spent_with_witnesses
         .iter()
         .map(|(u, wit)| (hash_to_prime(u), wit.clone())),
     );

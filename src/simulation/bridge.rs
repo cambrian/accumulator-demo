@@ -170,13 +170,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
       .clone()
       .exp_quotient(self.utxo_set_product.clone(), elems.iter().product())
       .unwrap();
-    let witnesses = agg_mem_wit.root_factor(&elems);
-    // TODO: Ideally `root_factor` would return the zipped version internally.
-    utxos
-      .iter()
-      .zip(witnesses.iter())
-      .map(|(x, y)| (x.clone(), y.clone()))
-      .collect()
+    agg_mem_wit.root_factor(&elems, utxos)
   }
 }
 

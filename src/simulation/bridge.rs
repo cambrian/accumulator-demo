@@ -29,7 +29,6 @@ pub struct UserUpdate {
   pub utxos_deleted: Vec<Utxo>,
 }
 
-#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Bridge<G: UnknownOrderGroup> {
   bridge_id: usize,
@@ -42,8 +41,6 @@ pub struct Bridge<G: UnknownOrderGroup> {
 impl<G: UnknownOrderGroup> Bridge<G> {
   /// Assumes all bridges are online from genesis. We may want to implement syncing later.
   /// Also assumes that bridge/user relationships are fixed in `main`.
-  #[allow(unused_variables)]
-  #[allow(clippy::type_complexity)]
   pub fn start(
     bridge_id: usize,
     utxo_set_witness: Accumulator<G>,
@@ -88,7 +85,6 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     witness_thread.join().unwrap();
   }
 
-  #[allow(clippy::type_complexity)]
   fn update(
     &mut self,
     block: Block<G>,

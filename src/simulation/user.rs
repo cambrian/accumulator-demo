@@ -12,7 +12,6 @@ pub struct User {
 }
 
 impl User {
-  #[allow(unused_variables)]
   // Right now users are limited to one transaction per block (i.e. they can issue one transaction
   // based on their UTXO set as of some block), since users have to wait for their state to be
   // updated before issuing a subsequent transaction. TODO: Allow for more tx per user per block.

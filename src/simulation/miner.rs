@@ -35,7 +35,9 @@ impl<G: UnknownOrderGroup> Miner<G> {
     let miner = miner_ref.clone();
     let transaction_thread = thread::spawn(move || {
       for tx in tx_receiver {
-        miner.lock().unwrap().add_transaction(tx);
+        if tx.block_height == miner.lock().unwrap().block_height {
+          miner.lock().unwrap().add_transaction(tx);
+        }
       }
     });
 

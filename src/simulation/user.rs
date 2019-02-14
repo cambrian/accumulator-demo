@@ -31,7 +31,7 @@ impl User {
       let mut utxos_to_spend = Vec::new();
       utxos_to_spend.push(user.get_input_for_transaction());
 
-      let utxos_spent_with_witnesses = {
+      let response = {
         let witness_request_id = Uuid::new_v4();
         loop {
           witness_request_sender
@@ -43,7 +43,7 @@ impl User {
             .unwrap();
           let response = witness_response_receiver.recv().unwrap();
           if response.request_id == witness_request_id {
-            break response.utxos_with_witnesses;
+            break response;
           }
           // Drain any other responses so we don't loop forever.
           loop {
@@ -60,8 +60,9 @@ impl User {
       };
 
       let new_trans = Transaction {
+        block_height: response.block_height,
         utxos_created: vec![new_utxo],
-        utxos_spent_with_witnesses,
+        utxos_spent_with_witnesses: response.utxos_with_witnesses,
       };
 
       tx_sender.try_send(new_trans).unwrap();

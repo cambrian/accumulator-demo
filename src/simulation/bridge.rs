@@ -19,6 +19,7 @@ pub struct WitnessRequest {
 
 #[derive(Clone, Debug)]
 pub struct WitnessResponse<G: UnknownOrderGroup> {
+  pub block_height: u64,
   pub request_id: Uuid,
   pub utxos_with_witnesses: Vec<(Utxo, Accumulator<G>)>,
 }
@@ -76,6 +77,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
           .create_membership_witnesses(request.utxos);
         witness_response_senders[&request.user_id]
           .try_send(WitnessResponse {
+            block_height: bridge.lock().unwrap().block_height,
             request_id: request.request_id,
             utxos_with_witnesses,
           })

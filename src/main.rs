@@ -34,13 +34,11 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   let (tx_sender, tx_receiver) = new_queue();
 
   // Initialize genesis user data.
-  let mut user_ids = Vec::new();
   let mut user_utxos = Vec::new();
   let mut user_elems = Vec::new();
   let mut user_utxos_product = int(1);
   let mut init_acc = Accumulator::<G>::new();
   for user_id in 0..NUM_USERS {
-    user_ids.push(user_id);
     let user_utxo = Utxo {
       id: Uuid::new_v4(),
       user_id,
@@ -81,26 +79,25 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
 
     // Initialize configurable user threads per bridge.
     for _ in 0..num_users_for_bridge {
-      let user_id = user_ids[user_idx];
       let user_utxo = user_utxos[user_idx].clone();
 
       // Associate user IDs with RPC response channels.
       let (witness_response_sender, witness_response_receiver) = new_queue();
       let (utxo_update_sender, utxo_update_receiver) = new_queue();
-      witness_response_senders.insert(user_id, witness_response_sender);
-      utxo_update_senders.insert(user_id, utxo_update_sender);
+      witness_response_senders.insert(user_idx, witness_response_sender);
+      utxo_update_senders.insert(user_idx, utxo_update_sender);
 
       let witness_request_sender = witness_request_sender.clone();
       let tx_sender = tx_sender.clone();
       simulation_threads.push(thread::spawn(move || {
         User::start(
-          user_id,
+          user_idx,
           bridge_idx,
           user_utxo,
-          witness_request_sender,
-          witness_response_receiver,
-          utxo_update_receiver,
-          tx_sender,
+          &witness_request_sender,
+          &witness_response_receiver,
+          &utxo_update_receiver,
+          &tx_sender,
         );
       }));
       user_idx += 1;
@@ -136,7 +133,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
         miner_idx == 0, // Elect first miner as leader.
         init_acc,
         BLOCK_TIME_MS,
-        block_sender,
+        &block_sender,
         block_receiver,
         tx_receiver,
       )

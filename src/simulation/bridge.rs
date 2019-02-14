@@ -53,7 +53,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     witness_response_senders: HashMap<usize, BroadcastSender<WitnessResponse<G>>>,
     user_update_senders: HashMap<usize, BroadcastSender<UserUpdate>>,
   ) {
-    let bridge_ref = Arc::new(Mutex::new(Bridge {
+    let bridge_ref = Arc::new(Mutex::new(Self {
       bridge_id,
       utxo_set_product,
       utxo_set_witness,
@@ -74,7 +74,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     let witness_thread = thread::spawn(move || {
       for request in witness_request_receiver {
         let bridge = bridge.lock().unwrap();
-        let utxos_with_witnesses = bridge.create_membership_witnesses(request.utxos);
+        let utxos_with_witnesses = bridge.create_membership_witnesses(&request.utxos);
         witness_response_senders[&request.user_id]
           .try_send(WitnessResponse {
             request_id: request.request_id,
@@ -100,7 +100,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     }
 
     let mut user_updates = HashMap::new();
-    for user_id in self.user_ids.iter() {
+    for user_id in &self.user_ids {
       user_updates.insert(
         user_id,
         UserUpdate {
@@ -163,7 +163,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
 
   /// Generates individual membership witnesses for each given UTXO. See Accumulator::root_factor
   /// and BBF V3 section 4.1.
-  fn create_membership_witnesses(&self, utxos: Vec<Utxo>) -> Vec<(Utxo, Accumulator<G>)> {
+  fn create_membership_witnesses(&self, utxos: &[Utxo]) -> Vec<(Utxo, Accumulator<G>)> {
     let elems: Vec<Integer> = utxos.iter().map(|u| hash_to_prime(u)).collect();
     let agg_mem_wit = self
       .utxo_set_witness

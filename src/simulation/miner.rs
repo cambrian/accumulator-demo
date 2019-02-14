@@ -21,11 +21,11 @@ impl<G: UnknownOrderGroup> Miner<G> {
     is_leader: bool,
     acc: Accumulator<G>,
     block_interval_ms: u64,
-    block_sender: BroadcastSender<Block<G>>,
+    block_sender: &BroadcastSender<Block<G>>,
     block_receiver: BroadcastReceiver<Block<G>>,
     tx_receiver: BroadcastReceiver<Transaction<G>>,
   ) {
-    let miner_ref = Arc::new(Mutex::new(Miner {
+    let miner_ref = Arc::new(Mutex::new(Self {
       acc,
       block_height: 0,
       pending_transactions: Vec::new(),

@@ -20,14 +20,14 @@ impl User {
     id: usize,
     bridge_id: usize,
     init_utxo: Utxo,
-    witness_request_sender: BroadcastSender<WitnessRequest>,
-    witness_response_receiver: BroadcastReceiver<WitnessResponse<G>>,
-    user_update_receiver: BroadcastReceiver<UserUpdate>,
-    tx_sender: BroadcastSender<Transaction<G>>,
+    witness_request_sender: &BroadcastSender<WitnessRequest>,
+    witness_response_receiver: &BroadcastReceiver<WitnessResponse<G>>,
+    user_update_receiver: &BroadcastReceiver<UserUpdate>,
+    tx_sender: &BroadcastSender<Transaction<G>>,
   ) {
     let mut utxo_set = HashSet::new();
     utxo_set.insert(init_utxo);
-    let mut user = User { id, utxo_set };
+    let mut user = Self { id, utxo_set };
 
     loop {
       let mut utxos_to_spend = Vec::new();

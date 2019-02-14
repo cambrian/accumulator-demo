@@ -139,7 +139,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
       .utxo_set_witness
       .clone()
       .update_membership_witness(
-        block.acc_new,
+        &block.acc_new,
         &[self.utxo_set_product.clone()],
         &untracked_additions[..],
         &untracked_deletions[..],

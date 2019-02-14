@@ -109,6 +109,8 @@ impl<G: UnknownOrderGroup> Bridge<G> {
       );
     }
 
+    let mut untracked_additions = Vec::new();
+    let mut untracked_deletions = Vec::new();
     for transaction in block.transactions {
       for (utxo, _witness) in transaction.utxos_spent_with_witnesses {
         if self.user_ids.contains(&utxo.user_id) {
@@ -118,6 +120,8 @@ impl<G: UnknownOrderGroup> Bridge<G> {
             .utxos_deleted
             .push(utxo.clone());
           self.utxo_set_product /= hash_to_prime(&utxo);
+        } else {
+          untracked_deletions.push(hash_to_prime(&utxo));
         }
       }
       for utxo in transaction.utxos_created {
@@ -128,16 +132,23 @@ impl<G: UnknownOrderGroup> Bridge<G> {
             .utxos_added
             .push(utxo.clone());
           self.utxo_set_product *= hash_to_prime(&utxo);
+        } else {
+          untracked_additions.push(hash_to_prime(&utxo));
         }
       }
     }
 
     // TODO: This is broken! How to fix?
-    self.utxo_set_witness = block
-      .new_acc
-      .delete(&[(self.utxo_set_product.clone(), self.utxo_set_witness.clone())])
-      .unwrap()
-      .0;
+    self.utxo_set_witness = self
+      .utxo_set_witness
+      .clone()
+      .update_membership_witness(
+        block.acc_new,
+        &[self.utxo_set_product.clone()],
+        &untracked_additions[..],
+        &untracked_deletions[..],
+      )
+      .unwrap();
     self.block_height = block.height;
 
     for (user_id, update) in user_updates {

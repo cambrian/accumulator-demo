@@ -18,7 +18,7 @@ pub struct Transaction<G: UnknownOrderGroup> {
 pub struct Block<G: UnknownOrderGroup> {
   pub height: u64,
   pub transactions: Vec<Transaction<G>>,
-  pub new_acc: Accumulator<G>,
+  pub acc_new: Accumulator<G>,
   pub proof_added: MembershipProof<G>,
   pub proof_deleted: MembershipProof<G>,
 }

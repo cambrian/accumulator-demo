@@ -72,11 +72,11 @@ impl<G: UnknownOrderGroup> Miner<G> {
   fn forge_block(&self) -> Block<G> {
     let (elems_added, elems_deleted) = util::elems_from_transactions(&self.pending_transactions);
     let (witness_deleted, proof_deleted) = self.acc.clone().delete(&elems_deleted).unwrap();
-    let (new_acc, proof_added) = witness_deleted.clone().add(&elems_added);
+    let (acc_new, proof_added) = witness_deleted.clone().add(&elems_added);
     Block {
       height: self.block_height + 1,
       transactions: self.pending_transactions.clone(),
-      new_acc,
+      acc_new,
       proof_added,
       proof_deleted,
     }
@@ -97,10 +97,10 @@ impl<G: UnknownOrderGroup> Miner<G> {
       .acc
       .verify_membership(&elems_deleted, &block.proof_deleted));
     assert!(block
-      .new_acc
+      .acc_new
       .verify_membership(&elems_added, &block.proof_added));
     assert!(block.proof_deleted.witness == block.proof_added.witness);
-    self.acc = block.new_acc;
+    self.acc = block.acc_new;
     self.block_height = block.height;
     self.pending_transactions.clear();
   }

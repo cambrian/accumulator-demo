@@ -140,8 +140,9 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   tx_receiver.unsubscribe();
   println!("Simulation running.");
   simulation_threads.push(thread::spawn(move || {
-    for block in block_receiver {
-      dbg!(block);
+    for _block in block_receiver {
+      print!("got block")
+      // dbg!(block);
     }
   }));
   for thread in simulation_threads {

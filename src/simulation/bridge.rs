@@ -12,14 +12,13 @@ use uuid::Uuid;
 
 #[derive(Clone, Debug)]
 pub struct WitnessRequest {
-  pub user_id: Uuid,
+  pub user_id: usize,
   pub request_id: Uuid,
   pub utxos: Vec<Utxo>,
 }
 
 #[derive(Clone, Debug)]
 pub struct WitnessResponse<G: UnknownOrderGroup> {
-  pub block_height: u64,
   pub request_id: Uuid,
   pub utxos_with_witnesses: Vec<(Utxo, Accumulator<G>)>,
 }
@@ -33,10 +32,11 @@ pub struct UserUpdate {
 #[allow(dead_code)]
 #[derive(Clone)]
 pub struct Bridge<G: UnknownOrderGroup> {
+  bridge_id: usize,
   utxo_set_product: Integer,
   utxo_set_witness: Accumulator<G>,
   block_height: u64,
-  user_ids: HashSet<Uuid>,
+  user_ids: HashSet<usize>,
 }
 
 impl<G: UnknownOrderGroup> Bridge<G> {
@@ -45,14 +45,16 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   #[allow(unused_variables)]
   #[allow(clippy::type_complexity)]
   pub fn start(
+    bridge_id: usize,
     utxo_set_witness: Accumulator<G>,
     utxo_set_product: Integer,
     block_receiver: BroadcastReceiver<Block<G>>,
     witness_request_receiver: BroadcastReceiver<WitnessRequest>,
-    witness_response_senders: HashMap<Uuid, BroadcastSender<WitnessResponse<G>>>,
-    user_update_senders: HashMap<Uuid, BroadcastSender<UserUpdate>>,
+    witness_response_senders: HashMap<usize, BroadcastSender<WitnessResponse<G>>>,
+    user_update_senders: HashMap<usize, BroadcastSender<UserUpdate>>,
   ) {
     let bridge_ref = Arc::new(Mutex::new(Bridge {
+      bridge_id,
       utxo_set_product,
       utxo_set_witness,
       block_height: 0,
@@ -71,13 +73,10 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     let bridge = bridge_ref.clone();
     let witness_thread = thread::spawn(move || {
       for request in witness_request_receiver {
-        let utxos_with_witnesses = bridge
-          .lock()
-          .unwrap()
-          .create_membership_witnesses(request.utxos);
+        let bridge = bridge.lock().unwrap();
+        let utxos_with_witnesses = bridge.create_membership_witnesses(request.utxos);
         witness_response_senders[&request.user_id]
           .try_send(WitnessResponse {
-            block_height: bridge.lock().unwrap().block_height,
             request_id: request.request_id,
             utxos_with_witnesses,
           })
@@ -93,7 +92,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   fn update(
     &mut self,
     block: Block<G>,
-    user_update_senders: &HashMap<Uuid, BroadcastSender<UserUpdate>>,
+    user_update_senders: &HashMap<usize, BroadcastSender<UserUpdate>>,
   ) {
     // Preserves idempotency if multiple miners are leaders.
     if block.height != self.block_height + 1 {
@@ -140,7 +139,6 @@ impl<G: UnknownOrderGroup> Bridge<G> {
       }
     }
 
-    // TODO: This is broken! How to fix?
     self.utxo_set_witness = self
       .utxo_set_witness
       .clone()
@@ -152,6 +150,11 @@ impl<G: UnknownOrderGroup> Bridge<G> {
       )
       .unwrap();
     self.block_height = block.height;
+
+    println!(
+      "Bridge {} received block {}.",
+      self.bridge_id, self.block_height
+    );
 
     for (user_id, update) in user_updates {
       user_update_senders[user_id].try_send(update).unwrap();
@@ -168,11 +171,17 @@ impl<G: UnknownOrderGroup> Bridge<G> {
       .exp_quotient(self.utxo_set_product.clone(), elems.iter().product())
       .unwrap();
     let witnesses = agg_mem_wit.root_factor(&elems);
-    // ideally root factor would return the zipped version internally
+    // TODO: Ideally `root_factor` would return the zipped version internally.
     utxos
       .iter()
       .zip(witnesses.iter())
       .map(|(x, y)| (x.clone(), y.clone()))
       .collect()
+  }
+}
+
+impl UserUpdate {
+  pub fn is_empty(&self) -> bool {
+    self.utxos_added.len() == 0 && self.utxos_deleted.len() == 0
   }
 }

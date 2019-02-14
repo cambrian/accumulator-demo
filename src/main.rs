@@ -11,6 +11,8 @@ use simulation::state::Utxo;
 use simulation::{Bridge, Miner, User};
 use std::collections::HashMap;
 use std::thread;
+use std::thread::sleep;
+use std::time::Duration;
 use uuid::Uuid;
 
 const NUM_MINERS: usize = 5;
@@ -19,7 +21,7 @@ const NUM_USERS: usize = 50;
 
 // NOTE: Ensure that sum of USERS_ASSIGNED_TO_BRIDGE is NUM_USERS.
 const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [10; 5];
-const BLOCK_TIME_MS: u64 = 1000;
+const BLOCK_TIME_MS: u64 = 5000;
 
 fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
   broadcast_queue(256)
@@ -37,8 +39,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   let mut user_elems = Vec::new();
   let mut user_utxos_product = int(1);
   let mut init_acc = Accumulator::<G>::new();
-  for _ in 0..NUM_USERS {
-    let user_id = Uuid::new_v4();
+  for user_id in 0..NUM_USERS {
     user_ids.push(user_id);
     let user_utxo = Utxo {
       id: Uuid::new_v4(),
@@ -57,6 +58,70 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     let witness_exp = &user_utxos_product / user_elem.clone();
     user_witnesses.push(user_acc.add(&[witness_exp]).0);
   }
+
+  // Initialize bridge threads.
+  let mut user_idx = 0;
+  #[allow(clippy::needless_range_loop)]
+  for bridge_idx in 0..NUM_BRIDGES {
+    let (witness_request_sender, witness_request_receiver) = new_queue();
+    let mut witness_response_senders = HashMap::new();
+    let mut utxo_update_senders = HashMap::new();
+
+    let num_users_for_bridge = USERS_ASSIGNED_TO_BRIDGE[bridge_idx];
+    let user_elem_witnesses: Vec<(Integer, Accumulator<G>)> = user_elems
+      [user_idx..user_idx + num_users_for_bridge]
+      .iter()
+      .zip(user_witnesses[user_idx..user_idx + num_users_for_bridge].iter())
+      .map(|(elem, witness)| (elem.clone(), witness.clone()))
+      .collect();
+    let bridge_init_acc = init_acc.clone().delete(&user_elem_witnesses).unwrap().0;
+    let bridge_utxo_set_product = user_elems[user_idx..user_idx + num_users_for_bridge]
+      .iter()
+      .product();
+
+    // Initialize configurable user threads per bridge.
+    for _ in 0..num_users_for_bridge {
+      let user_id = user_ids[user_idx];
+      let user_utxo = user_utxos[user_idx].clone();
+
+      // Associate user IDs with RPC response channels.
+      let (witness_response_sender, witness_response_receiver) = new_queue();
+      let (utxo_update_sender, utxo_update_receiver) = new_queue();
+      witness_response_senders.insert(user_id, witness_response_sender);
+      utxo_update_senders.insert(user_id, utxo_update_sender);
+
+      let witness_request_sender = witness_request_sender.clone();
+      let tx_sender = tx_sender.clone();
+      simulation_threads.push(thread::spawn(move || {
+        User::start(
+          user_id,
+          bridge_idx,
+          user_utxo,
+          witness_request_sender,
+          witness_response_receiver,
+          utxo_update_receiver,
+          tx_sender,
+        );
+      }));
+      user_idx += 1;
+    }
+
+    let block_receiver = block_receiver.add_stream();
+    simulation_threads.push(thread::spawn(move || {
+      Bridge::<G>::start(
+        bridge_idx,
+        bridge_init_acc,
+        bridge_utxo_set_product,
+        block_receiver,
+        witness_request_receiver,
+        witness_response_senders,
+        utxo_update_senders,
+      );
+    }));
+  }
+
+  println!("Sleeping so bridges can start up before miner.");
+  sleep(Duration::from_millis(2000));
 
   // Initialize miner threads.
   for miner_idx in 0..NUM_MINERS {
@@ -78,70 +143,15 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     }));
   }
 
-  // Initialize bridge threads.
-  let mut user_idx = 0;
-  #[allow(clippy::needless_range_loop)]
-  for bridge_idx in 0..NUM_BRIDGES {
-    let (witness_request_sender, witness_request_receiver) = new_queue();
-    let mut witness_response_senders = HashMap::new();
-    let mut utxo_update_senders = HashMap::new();
-
-    let num_users_for_bridge = USERS_ASSIGNED_TO_BRIDGE[bridge_idx];
-    let user_elem_witnesses: Vec<(Integer, Accumulator<G>)> = user_elems
-      [user_idx..user_idx + num_users_for_bridge]
-      .iter()
-      .zip(user_witnesses[user_idx..user_idx + num_users_for_bridge].iter())
-      .map(|(elem, witness)| (elem.clone(), witness.clone()))
-      .collect();
-    let bridge_init_acc = init_acc.clone().delete(&user_elem_witnesses).unwrap().0;
-    let bridge_utxo_set_product = user_elems[user_idx..user_idx + num_users_for_bridge]
-      .iter()
-      .product();;
-
-    // Initialize configurable user threads per bridge.
-    for _ in 0..num_users_for_bridge {
-      let user_id = user_ids[user_idx];
-      let user_utxo = user_utxos[user_idx].clone();
-
-      // Associate user IDs with RPC response channels.
-      let (witness_response_sender, witness_response_receiver) = new_queue();
-      let (utxo_update_sender, utxo_update_receiver) = new_queue();
-      witness_response_senders.insert(user_id, witness_response_sender);
-      utxo_update_senders.insert(user_id, utxo_update_sender);
-
-      let witness_request_sender = witness_request_sender.clone();
-      let tx_sender = tx_sender.clone();
-      simulation_threads.push(thread::spawn(move || {
-        User::start(
-          user_id,
-          user_utxo,
-          witness_request_sender,
-          witness_response_receiver,
-          utxo_update_receiver,
-          tx_sender,
-        );
-      }));
-      user_idx += 1;
-    }
-
-    let block_receiver = block_receiver.add_stream();
-    simulation_threads.push(thread::spawn(move || {
-      Bridge::<G>::start(
-        bridge_init_acc,
-        bridge_utxo_set_product,
-        block_receiver,
-        witness_request_receiver,
-        witness_response_senders,
-        utxo_update_senders,
-      );
-    }));
-  }
-
   tx_receiver.unsubscribe();
   println!("Simulation running.");
   simulation_threads.push(thread::spawn(move || {
     for block in block_receiver {
-      dbg!(block);
+      println!(
+        "Block {} has {} transactions.",
+        block.height,
+        block.transactions.len()
+      )
     }
   }));
   for thread in simulation_threads {

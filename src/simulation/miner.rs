@@ -35,9 +35,7 @@ impl<G: UnknownOrderGroup> Miner<G> {
     let miner = miner_ref.clone();
     let transaction_thread = thread::spawn(move || {
       for tx in tx_receiver {
-        if tx.block_height == miner.lock().unwrap().block_height {
-          miner.lock().unwrap().add_transaction(tx);
-        }
+        miner.lock().unwrap().add_transaction(tx);
       }
     });
 
@@ -54,7 +52,6 @@ impl<G: UnknownOrderGroup> Miner<G> {
       loop {
         sleep(Duration::from_millis(block_interval_ms));
         let new_block = miner_ref.lock().unwrap().forge_block();
-        // Note: This miner will consume the forged block via validate.
         block_sender.try_send(new_block).unwrap();
       }
     }
@@ -73,8 +70,15 @@ impl<G: UnknownOrderGroup> Miner<G> {
 
   fn forge_block(&self) -> Block<G> {
     let (elems_added, elems_deleted) = util::elems_from_transactions(&self.pending_transactions);
+    println!(
+      "Forging block {} with {} elems added and {} elems deleted.",
+      self.block_height + 1,
+      elems_added.len(),
+      elems_deleted.len()
+    );
     let (witness_deleted, proof_deleted) = self.acc.clone().delete(&elems_deleted).unwrap();
     let (acc_new, proof_added) = witness_deleted.clone().add(&elems_added);
+    println!("Forged block {}.", self.block_height + 1);
     Block {
       height: self.block_height + 1,
       transactions: self.pending_transactions.clone(),

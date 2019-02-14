@@ -7,16 +7,18 @@ use std::collections::HashSet;
 use uuid::Uuid;
 
 pub struct User {
-  id: Uuid, // For bridges to know who to send witness responses to.
+  id: usize, // For bridges to know who to send witness responses to.
   utxo_set: HashSet<Utxo>,
 }
 
 impl User {
   #[allow(unused_variables)]
   // Right now users are limited to one transaction per block (i.e. they can issue one transaction
-  // based on their UTXO set as of some block). TODO: Allow for more tx per user per block.
+  // based on their UTXO set as of some block), since users have to wait for their state to be
+  // updated before issuing a subsequent transaction. TODO: Allow for more tx per user per block.
   pub fn start<G: 'static + UnknownOrderGroup>(
-    id: Uuid,
+    id: usize,
+    bridge_id: usize,
     init_utxo: Utxo,
     witness_request_sender: BroadcastSender<WitnessRequest>,
     witness_response_receiver: BroadcastReceiver<WitnessResponse<G>>,
@@ -60,13 +62,21 @@ impl User {
       };
 
       let new_trans = Transaction {
-        block_height: response.block_height,
         utxos_created: vec![new_utxo],
         utxos_spent_with_witnesses: response.utxos_with_witnesses,
       };
 
       tx_sender.try_send(new_trans).unwrap();
-      user.update(user_update_receiver.recv().unwrap());
+      println!("User {} for bridge {} issued transaction.", id, bridge_id,);
+
+      // Keep processing updates until one of them is non-empty (i.e. the one we care about).
+      loop {
+        let update = user_update_receiver.recv().unwrap();
+        if !update.is_empty() {
+          user.update(update);
+          break;
+        }
+      }
     }
   }
 

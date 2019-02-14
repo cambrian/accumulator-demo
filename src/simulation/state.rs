@@ -5,12 +5,11 @@ use uuid::Uuid;
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Utxo {
   pub id: Uuid,
-  pub user_id: Uuid,
+  pub user_id: usize,
 }
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 pub struct Transaction<G: UnknownOrderGroup> {
-  pub block_height: u64,
   pub utxos_created: Vec<Utxo>,
   pub utxos_spent_with_witnesses: Vec<(Utxo, Accumulator<G>)>,
 }

@@ -23,6 +23,7 @@ fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
   broadcast_queue(256)
 }
 
+/// Runs our simulation over some group `G`.
 pub fn run_simulation<G: UnknownOrderGroup>() {
   println!("Simulation starting.");
   let mut simulation_threads = Vec::new();

@@ -12,7 +12,7 @@ general setup instructions.
 Just `cargo run`.
 
 ## Docs
-The vision for this simulation is adapted from _Batching Techniques for Accumulators with
+The concept for this simulation is adapted from _Batching Techniques for Accumulators with
 Applications to IOPs and Stateless Blockchains_ (Boneh, Bünz, and Fisch 2018)
 [[Link]](https://eprint.iacr.org/2018/1188.pdf).
 
@@ -23,8 +23,8 @@ and accumulators is assumed):
   publish updates to this accumulator value.
 - **Users** issue transactions from the UTXOs in their possession. When a user presents a UTXO to be
   spent, they must also present the accumulator witness for that UTXO (proving that the UTXO is
-  unspent with respect to the current accumulator value). Users can be understood as light clients
-  in common terminology.
+  unspent with respect to the current accumulator value). In common terminology, users can be
+  understood as light clients.
 - **Bridges** manage witnesses for a number of users, offering these users a liveness guarantee so
   they don't miss accumulator updates. There are efficient procedures to update a batched set of
   witnesses, and users can query their individual witnesses on-demand.

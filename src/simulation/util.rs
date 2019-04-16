@@ -4,6 +4,7 @@ use accumulator::Witness;
 use std::hash::Hash;
 
 #[allow(clippy::type_complexity)]
+/// Extracts the elements added and deleted in a set of `transactions`.
 pub fn elems_from_transactions<G: UnknownOrderGroup, T: Clone + Hash>(
   transactions: &[Transaction<G, T>],
 ) -> (Vec<T>, Vec<(T, Witness<G, T>)>) {

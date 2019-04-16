@@ -10,6 +10,7 @@ use std::thread;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
+/// A request from a user for a witness stored on this bridge.
 pub struct WitnessRequest {
   pub user_id: usize,
   pub request_id: Uuid,
@@ -17,18 +18,21 @@ pub struct WitnessRequest {
 }
 
 #[derive(Clone, Debug)]
+/// A response for a particular witness request.
 pub struct WitnessResponse<G: UnknownOrderGroup, T: Clone + Hash> {
   pub request_id: Uuid,
   pub utxos_with_witnesses: Vec<(Utxo, Witness<G, T>)>,
 }
 
 #[derive(Clone, Debug)]
+/// An update to the set of UTXOs tracked by a user (e.g. when a block is received by a bridge).
 pub struct UserUpdate {
   pub utxos_added: Vec<Utxo>,
   pub utxos_deleted: Vec<Utxo>,
 }
 
 #[derive(Clone)]
+/// A bridge node in our system, managing UTXO witnesses for a set of users.
 pub struct Bridge<G: UnknownOrderGroup> {
   bridge_id: usize,
   utxo_set: Vec<Utxo>,
@@ -38,8 +42,9 @@ pub struct Bridge<G: UnknownOrderGroup> {
 }
 
 impl<G: UnknownOrderGroup> Bridge<G> {
-  /// Assumes all bridges are online from genesis. We may want to implement syncing later.
-  /// Also assumes that bridge/user relationships are fixed in `main`.
+  /// Runs a bridge node's simulation loop.
+  // Assumes all bridges are online from genesis. We may want to implement syncing later.
+  // Also assumes that bridge/user relationships are fixed in `main`.
   pub fn start(
     bridge_id: usize,
     utxo_set_witness: Witness<G, Utxo>,
@@ -84,6 +89,8 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     witness_thread.join().unwrap();
   }
 
+  /// Given a new block, updates the witnesses stored on this bridge and propagates UTXO changes to
+  /// individual users.
   fn update(
     &mut self,
     block: Block<G, Utxo>,

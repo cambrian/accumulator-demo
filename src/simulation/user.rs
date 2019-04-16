@@ -6,12 +6,14 @@ use multiqueue::{BroadcastReceiver, BroadcastSender};
 use std::collections::HashSet;
 use uuid::Uuid;
 
+/// A end-user or light-client in our system.
 pub struct User {
   id: usize, // For bridges to know who to send witness responses to.
   utxo_set: HashSet<Utxo>,
 }
 
 impl User {
+  /// Runs a user's simulation loop.
   // Right now users are limited to one transaction per block (i.e. they can issue one transaction
   // based on their UTXO set as of some block), since users have to wait for their state to be
   // updated before issuing a subsequent transaction. TODO: Allow for more tx per user per block.
@@ -29,9 +31,11 @@ impl User {
     let mut user = Self { id, utxo_set };
 
     loop {
+      // Get a UTXO to sepnd.
       let mut utxos_to_spend = Vec::new();
       utxos_to_spend.push(user.get_input_for_transaction());
 
+      // Request a witness for the UTXOs we are spending.
       let response = {
         let witness_request_id = Uuid::new_v4();
         loop {
@@ -65,10 +69,12 @@ impl User {
         utxos_spent_with_witnesses: response.utxos_with_witnesses,
       };
 
+      // Issue a transaction to miners.
       tx_sender.try_send(new_trans).unwrap();
       println!("User {} for bridge {} issued transaction.", id, bridge_id,);
 
-      // Keep processing updates until one of them is non-empty (i.e. the one we care about).
+      // Keep processing witness updates from the bridge until one of them is non-empty (i.e. the
+      // one we care about).
       loop {
         let update = user_update_receiver.recv().unwrap();
         if !update.is_empty() {

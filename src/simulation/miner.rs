@@ -9,6 +9,7 @@ use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
 
+/// A stateless miner in our system.
 pub struct Miner<G: UnknownOrderGroup, T: Clone + Hash> {
   acc: Accumulator<G, T>,
   block_height: u64,
@@ -16,7 +17,8 @@ pub struct Miner<G: UnknownOrderGroup, T: Clone + Hash> {
 }
 
 impl<G: UnknownOrderGroup, T: 'static + Clone + Eq + Hash + PartialEq + Send> Miner<G, T> {
-  /// Assumes all miners are online from genesis. We may want to implement syncing later.
+  /// Runs a miner's simulation loop.
+  // Assumes all miners are online from genesis. We may want to implement syncing later.
   pub fn start(
     is_leader: bool,
     acc: Accumulator<G, T>,

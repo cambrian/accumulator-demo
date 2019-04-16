@@ -1,12 +1,8 @@
 //! Simulation runner.
-//! TODO: Add configurability/statistics.
 mod simulation;
 use accumulator::group::{Rsa2048, UnknownOrderGroup};
-use accumulator::hash::hash_to_prime;
-use accumulator::util::int;
-use accumulator::Accumulator;
+use accumulator::{Accumulator, Witness};
 use multiqueue::{broadcast_queue, BroadcastReceiver, BroadcastSender};
-use rug::Integer;
 use simulation::state::Utxo;
 use simulation::{Bridge, Miner, User};
 use std::collections::HashMap;
@@ -17,10 +13,10 @@ use uuid::Uuid;
 
 const NUM_MINERS: usize = 5;
 const NUM_BRIDGES: usize = 5;
-const NUM_USERS: usize = 50;
+const NUM_USERS: usize = 15;
 
 // NOTE: Ensure that sum of USERS_ASSIGNED_TO_BRIDGE is NUM_USERS.
-const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [10; 5];
+const USERS_ASSIGNED_TO_BRIDGE: [usize; NUM_BRIDGES] = [3; 5];
 const BLOCK_TIME_MS: u64 = 5000;
 
 fn new_queue<T: Clone>() -> (BroadcastSender<T>, BroadcastReceiver<T>) {
@@ -33,31 +29,31 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
   let (block_sender, block_receiver) = new_queue();
   let (tx_sender, tx_receiver) = new_queue();
 
-  // Initialize genesis user data.
+  // Initialize genesis user data (each user has a single UTXO).
   let mut user_utxos = Vec::new();
-  let mut user_elems = Vec::new();
-  let mut user_utxos_product = int(1);
-  let mut init_acc = Accumulator::<G>::new();
   for user_id in 0..NUM_USERS {
     let user_utxo = Utxo {
       id: Uuid::new_v4(),
       user_id,
     };
-    let user_elem = hash_to_prime(&user_utxo);
-    init_acc = init_acc.add(&[user_elem.clone()]).0;
-    user_utxos_product *= user_elem.clone();
     user_utxos.push(user_utxo);
-    user_elems.push(user_elem);
   }
 
+  let mut init_acc = Accumulator::<G, Utxo>::empty();
+  init_acc = init_acc.add(&user_utxos);
+
+  // Compute initial user witnesses.
   let mut user_witnesses = Vec::new();
-  for user_elem in &user_elems {
-    let user_acc = Accumulator::<G>::new();
-    let witness_exp = &user_utxos_product / user_elem.clone();
-    user_witnesses.push(user_acc.add(&[witness_exp]).0);
+  let witness_all = Witness(Accumulator::<G, Utxo>::empty());
+  for user_utxo in &user_utxos {
+    let user_witness = witness_all
+      .clone()
+      .compute_subset_witness(&user_utxos, &[user_utxo.clone()])
+      .unwrap();
+    user_witnesses.push(user_witness);
   }
 
-  // Initialize bridge threads.
+  // Initialize bridge threads, each of which manages witnesses for a number of users.
   let mut user_idx = 0;
   #[allow(clippy::needless_range_loop)]
   for bridge_idx in 0..NUM_BRIDGES {
@@ -66,16 +62,14 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     let mut utxo_update_senders = HashMap::new();
 
     let num_users_for_bridge = USERS_ASSIGNED_TO_BRIDGE[bridge_idx];
-    let user_elem_witnesses: Vec<(Integer, Accumulator<G>)> = user_elems
+    let user_elem_witnesses: Vec<(Utxo, Witness<G, Utxo>)> = user_utxos
       [user_idx..user_idx + num_users_for_bridge]
       .iter()
       .zip(user_witnesses[user_idx..user_idx + num_users_for_bridge].iter())
       .map(|(elem, witness)| (elem.clone(), witness.clone()))
       .collect();
-    let bridge_init_acc = init_acc.clone().delete(&user_elem_witnesses).unwrap().0;
-    let bridge_utxo_set_product = user_elems[user_idx..user_idx + num_users_for_bridge]
-      .iter()
-      .product();
+    let bridge_init_witness = Witness(init_acc.clone().delete(&user_elem_witnesses).unwrap());
+    let bridge_utxo_set: Vec<Utxo> = user_utxos[user_idx..user_idx + num_users_for_bridge].to_vec();
 
     // Initialize configurable user threads per bridge.
     for _ in 0..num_users_for_bridge {
@@ -107,8 +101,8 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     simulation_threads.push(thread::spawn(move || {
       Bridge::<G>::start(
         bridge_idx,
-        bridge_init_acc,
-        bridge_utxo_set_product,
+        bridge_init_witness,
+        bridge_utxo_set,
         block_receiver,
         witness_request_receiver,
         witness_response_senders,
@@ -129,7 +123,7 @@ pub fn run_simulation<G: UnknownOrderGroup>() {
     let block_receiver = block_receiver.add_stream();
     let tx_receiver = tx_receiver.add_stream();
     simulation_threads.push(thread::spawn(move || {
-      Miner::<G>::start(
+      Miner::<G, Utxo>::start(
         miner_idx == 0, // Elect first miner as leader.
         init_acc,
         BLOCK_TIME_MS,

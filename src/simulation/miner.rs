@@ -3,27 +3,27 @@ use super::util;
 use accumulator::group::UnknownOrderGroup;
 use accumulator::Accumulator;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
-use rug::Integer;
+use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::thread::sleep;
 use std::time::Duration;
 
-pub struct Miner<G: UnknownOrderGroup> {
-  acc: Accumulator<G>,
+pub struct Miner<G: UnknownOrderGroup, T: Clone + Hash> {
+  acc: Accumulator<G, T>,
   block_height: u64,
-  pending_transactions: Vec<Transaction<G>>,
+  pending_transactions: Vec<Transaction<G, T>>,
 }
 
-impl<G: UnknownOrderGroup> Miner<G> {
+impl<G: UnknownOrderGroup, T: 'static + Clone + Eq + Hash + PartialEq + Send> Miner<G, T> {
   /// Assumes all miners are online from genesis. We may want to implement syncing later.
   pub fn start(
     is_leader: bool,
-    acc: Accumulator<G>,
+    acc: Accumulator<G, T>,
     block_interval_ms: u64,
-    block_sender: &BroadcastSender<Block<G>>,
-    block_receiver: BroadcastReceiver<Block<G>>,
-    tx_receiver: BroadcastReceiver<Transaction<G>>,
+    block_sender: &BroadcastSender<Block<G, T>>,
+    block_receiver: BroadcastReceiver<Block<G, T>>,
+    tx_receiver: BroadcastReceiver<Transaction<G, T>>,
   ) {
     let miner_ref = Arc::new(Mutex::new(Self {
       acc,
@@ -60,7 +60,7 @@ impl<G: UnknownOrderGroup> Miner<G> {
     validate_thread.join().unwrap();
   }
 
-  fn add_transaction(&mut self, transaction: Transaction<G>) {
+  fn add_transaction(&mut self, transaction: Transaction<G, T>) {
     // This contains check could incur overhead; ideally we'd use a set but Rust HashSet is kind of
     // a pain to use here.
     if !self.pending_transactions.contains(&transaction) {
@@ -68,7 +68,7 @@ impl<G: UnknownOrderGroup> Miner<G> {
     }
   }
 
-  fn forge_block(&self) -> Block<G> {
+  fn forge_block(&self) -> Block<G, T> {
     let (elems_added, elems_deleted) = util::elems_from_transactions(&self.pending_transactions);
     println!(
       "Forging block {} with {} elems added and {} elems deleted.",
@@ -76,8 +76,9 @@ impl<G: UnknownOrderGroup> Miner<G> {
       elems_added.len(),
       elems_deleted.len()
     );
-    let (witness_deleted, proof_deleted) = self.acc.clone().delete(&elems_deleted).unwrap();
-    let (acc_new, proof_added) = witness_deleted.clone().add(&elems_added);
+    let (witness_deleted, proof_deleted) =
+      self.acc.clone().delete_with_proof(&elems_deleted).unwrap();
+    let (acc_new, proof_added) = witness_deleted.clone().add_with_proof(&elems_added);
     println!("Forged block {}.", self.block_height + 1);
     Block {
       height: self.block_height + 1,
@@ -88,23 +89,23 @@ impl<G: UnknownOrderGroup> Miner<G> {
     }
   }
 
-  fn validate_block(&mut self, block: Block<G>) {
+  fn validate_block(&mut self, block: Block<G, T>) {
     // Preserves idempotency if multiple miners are leaders.
     if block.height != self.block_height + 1 {
       return;
     }
 
     let (elems_added, elem_witnesses_deleted) = util::elems_from_transactions(&block.transactions);
-    let elems_deleted: Vec<Integer> = elem_witnesses_deleted
+    let elems_deleted: Vec<T> = elem_witnesses_deleted
       .iter()
       .map(|(u, _wit)| u.clone())
       .collect();
     assert!(self
       .acc
-      .verify_membership(&elems_deleted, &block.proof_deleted));
+      .verify_membership_batch(&elems_deleted, &block.proof_deleted));
     assert!(block
       .acc_new
-      .verify_membership(&elems_added, &block.proof_added));
+      .verify_membership_batch(&elems_added, &block.proof_added));
     assert!(block.proof_deleted.witness == block.proof_added.witness);
     self.acc = block.acc_new;
     self.block_height = block.height;

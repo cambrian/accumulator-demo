@@ -1,11 +1,10 @@
 use super::state::{Block, Utxo};
 use accumulator::group::UnknownOrderGroup;
-use accumulator::hash::hash_to_prime;
-use accumulator::Accumulator;
+use accumulator::Witness;
 use multiqueue::{BroadcastReceiver, BroadcastSender};
-use rug::Integer;
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use uuid::Uuid;
@@ -18,9 +17,9 @@ pub struct WitnessRequest {
 }
 
 #[derive(Clone, Debug)]
-pub struct WitnessResponse<G: UnknownOrderGroup> {
+pub struct WitnessResponse<G: UnknownOrderGroup, T: Clone + Hash> {
   pub request_id: Uuid,
-  pub utxos_with_witnesses: Vec<(Utxo, Accumulator<G>)>,
+  pub utxos_with_witnesses: Vec<(Utxo, Witness<G, T>)>,
 }
 
 #[derive(Clone, Debug)]
@@ -32,8 +31,8 @@ pub struct UserUpdate {
 #[derive(Clone)]
 pub struct Bridge<G: UnknownOrderGroup> {
   bridge_id: usize,
-  utxo_set_product: Integer,
-  utxo_set_witness: Accumulator<G>,
+  utxo_set: Vec<Utxo>,
+  utxo_set_witness: Witness<G, Utxo>,
   block_height: u64,
   user_ids: HashSet<usize>,
 }
@@ -43,16 +42,16 @@ impl<G: UnknownOrderGroup> Bridge<G> {
   /// Also assumes that bridge/user relationships are fixed in `main`.
   pub fn start(
     bridge_id: usize,
-    utxo_set_witness: Accumulator<G>,
-    utxo_set_product: Integer,
-    block_receiver: BroadcastReceiver<Block<G>>,
+    utxo_set_witness: Witness<G, Utxo>,
+    utxo_set: Vec<Utxo>,
+    block_receiver: BroadcastReceiver<Block<G, Utxo>>,
     witness_request_receiver: BroadcastReceiver<WitnessRequest>,
-    witness_response_senders: HashMap<usize, BroadcastSender<WitnessResponse<G>>>,
+    witness_response_senders: HashMap<usize, BroadcastSender<WitnessResponse<G, Utxo>>>,
     user_update_senders: HashMap<usize, BroadcastSender<UserUpdate>>,
   ) {
     let bridge_ref = Arc::new(Mutex::new(Self {
       bridge_id,
-      utxo_set_product,
+      utxo_set,
       utxo_set_witness,
       block_height: 0,
       user_ids: user_update_senders.keys().cloned().collect(),
@@ -87,7 +86,7 @@ impl<G: UnknownOrderGroup> Bridge<G> {
 
   fn update(
     &mut self,
-    block: Block<G>,
+    block: Block<G, Utxo>,
     user_update_senders: &HashMap<usize, BroadcastSender<UserUpdate>>,
   ) {
     // Preserves idempotency if multiple miners are leaders.
@@ -116,9 +115,9 @@ impl<G: UnknownOrderGroup> Bridge<G> {
             .unwrap()
             .utxos_deleted
             .push(utxo.clone());
-          self.utxo_set_product /= hash_to_prime(&utxo);
+          self.utxo_set.retain(|x| *x != utxo);
         } else {
-          untracked_deletions.push(hash_to_prime(&utxo));
+          untracked_deletions.push(utxo);
         }
       }
       for utxo in transaction.utxos_created {
@@ -128,19 +127,18 @@ impl<G: UnknownOrderGroup> Bridge<G> {
             .unwrap()
             .utxos_added
             .push(utxo.clone());
-          self.utxo_set_product *= hash_to_prime(&utxo);
+          self.utxo_set.push(utxo);
         } else {
-          untracked_additions.push(hash_to_prime(&utxo));
+          untracked_additions.push(utxo);
         }
       }
     }
 
-    self.utxo_set_witness = self
-      .utxo_set_witness
-      .clone()
+    self.utxo_set_witness = block
+      .acc_new
       .update_membership_witness(
-        &block.acc_new,
-        &[self.utxo_set_product.clone()],
+        self.utxo_set_witness.clone(),
+        &self.utxo_set,
         &untracked_additions[..],
         &untracked_deletions[..],
       )
@@ -157,16 +155,15 @@ impl<G: UnknownOrderGroup> Bridge<G> {
     }
   }
 
-  /// Generates individual membership witnesses for each given UTXO. See Accumulator::root_factor
-  /// and BBF V3 section 4.1.
-  fn create_membership_witnesses(&self, utxos: &[Utxo]) -> Vec<(Utxo, Accumulator<G>)> {
-    let elems: Vec<Integer> = utxos.iter().map(|u| hash_to_prime(u)).collect();
+  /// Generates individual membership witnesses for each given UTXO. See `Witness::root_factor`
+  /// and BBF V3 Section 4.1.
+  fn create_membership_witnesses(&self, utxos: &[Utxo]) -> Vec<(Utxo, Witness<G, Utxo>)> {
     let agg_mem_wit = self
       .utxo_set_witness
       .clone()
-      .exp_quotient(self.utxo_set_product.clone(), elems.iter().product())
+      .compute_subset_witness(&self.utxo_set, utxos)
       .unwrap();
-    agg_mem_wit.root_factor(&elems, utxos)
+    agg_mem_wit.compute_individual_witnesses(utxos)
   }
 }
 

@@ -20,9 +20,9 @@ impl User {
     bridge_id: usize,
     init_utxo: Utxo,
     witness_request_sender: &BroadcastSender<WitnessRequest>,
-    witness_response_receiver: &BroadcastReceiver<WitnessResponse<G>>,
+    witness_response_receiver: &BroadcastReceiver<WitnessResponse<G, Utxo>>,
     user_update_receiver: &BroadcastReceiver<UserUpdate>,
-    tx_sender: &BroadcastSender<Transaction<G>>,
+    tx_sender: &BroadcastSender<Transaction<G, Utxo>>,
   ) {
     let mut utxo_set = HashSet::new();
     utxo_set.insert(init_utxo);

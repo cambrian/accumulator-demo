@@ -34,4 +34,4 @@ milliseconds. There are `n` users assigned to each of `m` bridge nodes, for a to
 in the system. Although we include `r` different miners in the simulation, one of them is always
 elected leader to establish consensus.
 
-For more details, please review the comments in our code.
+For more details, please review our code.

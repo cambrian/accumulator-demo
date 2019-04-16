@@ -10,7 +10,7 @@ use std::thread;
 use uuid::Uuid;
 
 #[derive(Clone, Debug)]
-/// A request from a user for a witness stored on this bridge.
+/// A request from a user for a witness stored on some bridge.
 pub struct WitnessRequest {
   pub user_id: usize,
   pub request_id: Uuid,

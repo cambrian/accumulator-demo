@@ -13,7 +13,7 @@ pub struct Utxo {
 
 #[derive(Clone, PartialEq, Eq, Hash, Debug)]
 /// A transaction, defined by UTXOs created and UTXOs spent. UTXOs being spent must come with a
-/// witness to prove that they are unspent.
+/// witness to prove that they are currently unspent.
 pub struct Transaction<G: UnknownOrderGroup, T: Hash> {
   pub utxos_created: Vec<T>,
   pub utxos_spent_with_witnesses: Vec<(T, Witness<G, T>)>,

@@ -63,8 +63,8 @@ impl<G: UnknownOrderGroup, T: 'static + Clone + Eq + Hash + PartialEq + Send> Mi
   }
 
   fn add_transaction(&mut self, transaction: Transaction<G, T>) {
-    // This contains check could incur overhead; ideally we'd use a set but Rust HashSet is kind of
-    // a pain to use here.
+    // This `contains` check could incur overhead; ideally we'd use a set but Rust `HashSet` is
+    // kind of a pain to use here.
     if !self.pending_transactions.contains(&transaction) {
       self.pending_transactions.push(transaction);
     }

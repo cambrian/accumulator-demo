@@ -35,7 +35,7 @@ impl User {
       let mut utxos_to_spend = Vec::new();
       utxos_to_spend.push(user.get_input_for_transaction());
 
-      // Request a witness for the UTXOs we are spending.
+      // Request a witness for the UTXO we are spending.
       let response = {
         let witness_request_id = Uuid::new_v4();
         loop {
@@ -73,8 +73,8 @@ impl User {
       tx_sender.try_send(new_trans).unwrap();
       println!("User {} for bridge {} issued transaction.", id, bridge_id,);
 
-      // Keep processing witness updates from the bridge until one of them is non-empty (i.e. the
-      // one we care about).
+      // Keep processing UTXO updates from the bridge until one of them is non-empty (i.e. the
+      // one we care about, pertaining to the UTXO we spent).
       loop {
         let update = user_update_receiver.recv().unwrap();
         if !update.is_empty() {

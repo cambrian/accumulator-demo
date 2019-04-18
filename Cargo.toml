@@ -1,6 +1,6 @@
 [package]
 name = "accumulator-demo"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2018"
 authors = [
   "Pablo Aldape <pablo.aldape@gmail.com>",
@@ -14,7 +14,7 @@ readme = "README.md"
 repository = "https://github.com/cambrian/accumulator-demo"
 
 [dependencies]
-accumulator = { git = "https://github.com/cambrian/accumulator.git", tag = "v0.2.0" }
+accumulator = { git = "https://github.com/cambrian/accumulator.git", tag = "v0.2.1" }
 gmp-mpfr-sys = "1.1.12"
 multiqueue = "0.3.2"
 rug = "1.3.0"
